@@ -1,0 +1,22 @@
+{
+  "images_dir": "data/first_training/images",
+  "masks_dir": "data/first_training/masks",
+  "image_height": 600,
+  "image_width": 600,
+  "channels": 1,
+  "num_classes": 4,
+  "val_fraction": 0.1,
+  "test_fraction": 0.2,
+  "random_seed": 123,
+  "batch_size": 4,
+  "epochs": 15,
+  "learning_rate": 0.001,
+  "aug_rotate": true,
+  "aug_flip_h": true,
+  "aug_flip_v": false,
+  "aug_random_zoom": true,
+  "aug_zoom_range": 0.1,
+  "output_root": "runs",
+  "run_name": "ng_f60",
+  "use_mixed_precision": false
+}

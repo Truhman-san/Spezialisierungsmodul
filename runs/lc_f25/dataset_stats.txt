@@ -1,0 +1,8 @@
+train_fraction: 0.25
+train_steps: 273
+val_steps:   156
+test_steps:  312
+batch_size:  4
+approx_train_samples: 1092
+approx_val_samples:   624
+approx_test_samples:  1248

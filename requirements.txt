@@ -1,0 +1,7 @@
+numpy
+opencv-python
+Pillow
+scipy
+tqdm
+tensorflow>=2.12
+scikit-learn>=1.1s

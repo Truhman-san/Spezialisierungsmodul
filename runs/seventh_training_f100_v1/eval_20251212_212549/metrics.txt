@@ -1,0 +1,19 @@
+=== Per-Klasse Precision / Recall / F1 ===
+Klasse 0: Prec 99.95% | Rec 99.98% | F1 99.97% | Support 459585400
+Klasse 1: Prec 87.48% | Rec 74.33% | F1 80.37% | Support 479606
+Klasse 2: Prec 85.89% | Rec 75.07% | F1 80.12% | Support 355510
+Klasse 3: Prec 94.33% | Rec 86.29% | F1 90.13% | Support 379484
+
+=== IoU pro Klasse ===
+Klasse 0: IoU 99.94%
+Klasse 1: IoU 67.18%
+Klasse 2: IoU 66.83%
+Klasse 3: IoU 82.04%
+
+Mean IoU: 78.99%
+
+Confusion-Matrix (rows=true, cols=pred):
+459512393    49931    17755     5321
+   93031   356471    26024     4080
+   77726      601   266896    10287
+   51443      496       81   327464
