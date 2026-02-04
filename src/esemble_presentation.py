@@ -8,22 +8,19 @@ from PIL import Image
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 
-from src.predictions.utils import load_png_gray  # (H,W,1) float32, [0,1]
+from src.predictions.utils import load_png_gray  
 
-# Ordner, in dem dieses Skript liegt: <projekt>/src
+# Ordner, in dem dieses Skript liegt
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
-# === Pfade zu deinen beiden Modellen (ANPASSEN!) ============================
 MODEL1_PATH = PROJECT_ROOT / "runs" / "ng_f60" / "model_final.keras"
 MODEL2_PATH = PROJECT_ROOT / "runs" / "ngns_f80" / "model_final.keras"
 
 RAW_TIF_DIR    = PROJECT_ROOT / "real_stm_raw_tifs"
 REAL_IMAGE_DIR = PROJECT_ROOT / "real_stm_converted_png"
 
-# Eigener Output-Ordner für Ensemble
 OUTPUT_DIR     = PROJECT_ROOT / "runs" / "ensemble_ngns_f80_ng_f80" / "predictions_real_tripanel_presentation"
-# ============================================================================
 
 
 def tif_to_colormap_png(tif_path, cmap_name="inferno"):
@@ -31,8 +28,8 @@ def tif_to_colormap_png(tif_path, cmap_name="inferno"):
     if img.mode != "L":
         img = img.convert("L")
 
-    raw = np.array(img).astype(np.float32)  # 0..255
-    raw_norm = raw / 255.0                  # 0..1
+    raw = np.array(img).astype(np.float32) 
+    raw_norm = raw / 255.0                  
 
     cmap = cm.get_cmap(cmap_name)
     colored = cmap(raw_norm)[..., :3]
@@ -69,47 +66,42 @@ def main():
             orig_arr = None
 
         # Modell-Input
-        image_tf = load_png_gray(img_path)        # (H,W,1), float32, [0,1]
-        img_model = image_tf.numpy()[..., 0]      # für Anzeige Panel 3
+        image_tf = load_png_gray(img_path)    
+        img_model = image_tf.numpy()[..., 0]     
 
         # Graustufenbild für Panel 2
-        gray_arr = np.array(Image.open(img_path))  # (H,W) uint8
+        gray_arr = np.array(Image.open(img_path)) 
 
         # === ENSEMBLE PREDICTION (Modell 1 = Basis, Modell 2 = Korrektor) ===
         logits1 = model1.predict(
             tf.expand_dims(image_tf, axis=0), verbose=0
-        )[0]  # (H,W,C)
+        )[0] 
         logits2 = model2.predict(
             tf.expand_dims(image_tf, axis=0), verbose=0
-        )[0]  # (H,W,C)
+        )[0]  
 
-        # Falls deine Modelle schon Softmax im letzten Layer haben,
-        # sind logits1/logits2 bereits Wahrscheinlichkeiten.
         p1 = logits1
         p2 = logits2
 
         # Vorhersagen + Konfidenzen je Modell
-        pred1 = np.argmax(p1, axis=-1).astype(np.uint8)   # (H,W)
-        conf1 = np.max(p1, axis=-1).astype(np.float32)    # (H,W)
+        pred1 = np.argmax(p1, axis=-1).astype(np.uint8)  
+        conf1 = np.max(p1, axis=-1).astype(np.float32)   
 
-        pred2 = np.argmax(p2, axis=-1).astype(np.uint8)   # (H,W)
-        conf2 = np.max(p2, axis=-1).astype(np.float32)    # (H,W)
+        pred2 = np.argmax(p2, axis=-1).astype(np.uint8)  
+        conf2 = np.max(p2, axis=-1).astype(np.float32)  
 
         # Start: Modell 1 ist Basis
         final_pred = pred1.copy()
 
         # Klassenspezifische Infos für 2-Dimer
-        class_idx_2dimer = 2  # 2-Dimer-Klasse (anpassen, falls andere ID)
-        p1_2d = p1[..., class_idx_2dimer]  # (H,W), Prob für 2-Dimer laut Modell 1
+        class_idx_2dimer = 2 
+        p1_2d = p1[..., class_idx_2dimer]  # Prob für 2-Dimer laut Modell 1
 
-        # --- Regel 1: Modell 2 darf zusätzliche Defekte hinzufügen ----------
-        # Schwelle, ab wann Modell 2 "sicher genug" ist:
         T_ADD = 0.75        # Modell 2 Konfidenz
         T_SUPPORT_2D = 0.80 # Mindest-Prob für 2-Dimer in Modell 1
 
         base_add_mask = (pred1 == 0) & (pred2 != 0) & (conf2 > T_ADD)
 
-        # a) Nicht-2-Dimer-Klassen wie bisher
         add_mask_non2 = base_add_mask & (pred2 != class_idx_2dimer)
 
         # b) 2-Dimer nur, wenn Modell 1 auch nennenswerte 2-Dimer-Prob hat
@@ -122,8 +114,6 @@ def main():
         add_mask = add_mask_non2 | add_mask_2
         final_pred[add_mask] = pred2[add_mask]
 
-        # --- (Optional) Regel 2: Modell 2 darf unsichere Defekte von Modell 1 löschen ---
-        # Nur, wenn Modell 2 sehr sicher "Hintergrund" sagt und Modell 1 nicht sehr sicher ist.
         T_CLEAR = 0.65  # Modell 2 sehr sicher auf Hintergrund
         T_LOW   = 0.65  # Modell 1 eher unsicher
 
@@ -136,7 +126,6 @@ def main():
         final_pred[clear_mask] = 0
 
         pred_labels = final_pred
-        # =====================================================================
 
         # Tripanel
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))

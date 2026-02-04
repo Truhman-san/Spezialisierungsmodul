@@ -9,10 +9,7 @@ from .overlay_engine import apply_random_signatures
 
 
 def rotate_45(img: np.ndarray, is_mask: bool = False) -> np.ndarray:
-    """
-    Dreht Bild oder Maske um 45° um das Zentrum.
-    - is_mask=True -> nearest neighbour (keine Mischklassen)
-    """
+
     h, w = img.shape[:2]
     center = (w / 2.0, h / 2.0)
     M = cv2.getRotationMatrix2D(center, 45.0, 1.0)
@@ -38,20 +35,11 @@ def generate_synthetic_stm_sample(
     canvas_size: Tuple[int, int] = CANVAS_SIZE,
     with_terraces: bool = True,
     with_defects: bool = True,
-    with_noise: bool = False,      # Platzhalter für später
+    with_noise: bool = False,     
     rotate_45_deg: bool = True,
     oversize_factor: float = 1.42,
     n_defects_range=(0, 6),
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Erzeugt ein STM-Synthetikbild + Signatur-Maske.
-
-    Maske:
-        0 = Hintergrund (inkl. Dimer / Terrassen)
-        1 = 1-Dimer-Signatur
-        2 = 2-Dimer-Signatur
-        3 = Double-Dimer-Signatur
-    """
     H, W = canvas_size
     H_big = int(H * oversize_factor)
     W_big = int(W * oversize_factor)
@@ -63,16 +51,14 @@ def generate_synthetic_stm_sample(
         img_big, mask_big = apply_random_signatures(
             img_big,
             mask_big,
-            n_defects_range=n_defects_range,   # z.B. (3, 8)
+            n_defects_range=n_defects_range,  
         )
 
-    # (optionales) Noise später hier einbauen
 
     if rotate_45_deg:
         img_big  = rotate_45(img_big, is_mask=False)
         mask_big = rotate_45(mask_big, is_mask=True)
 
-    # Mittelpunkt der großen Fläche
     cy = H_big // 2
     cx = W_big // 2
     y0 = cy - H // 2

@@ -8,7 +8,6 @@ from .overlays import (
     apply_defect_overlay_v2,
 )
 
-# --- Welche Signatur gehört wohin ---
 _APPLIERS = {
     "gaussian": gaussian_one_pair,      # 1-Dimer
     "v1": apply_defect_overlay_v1,         # 2-Dimer
@@ -29,77 +28,8 @@ _MODE_SNAP = {
     "v2":       (TILE_WIDTH, 4 * TILE_HEIGHT),
 }
 
-# --- Optionale Tile-Phasen (falls Base-Tile nicht bei (0,0) beginnt) ---
 _LATTICE_PHASE_X = 0
 _LATTICE_PHASE_Y = 0
-
-
-def _refine_snap_to_dimer_line(
-    image: np.ndarray,
-    x0: int,
-    y0: int,
-    bbox_w: int,
-    bbox_h: int,
-    orientation: str,
-    search_radius: int = 4,
-) -> tuple[int, int]:
-    """
-    Verfeinert das Grid-Snapping, indem in einem kleinen Fenster entlang
-    der Dimer-Normalen nach dem lokalen Helligkeitsmaximum gesucht wird.
-
-    - orientation "H": Dimerreihen horizontal -> entlang y suchen
-    - orientation "V": Dimerreihen vertikal   -> entlang x suchen
-    """
-    H, W = image.shape[:2]
-    best_x, best_y = x0, y0
-    best_score = -1e9
-
-    if orientation == "H":
-        # Suche in y-Richtung (Normalenrichtung)
-        y_min = max(0, y0 - search_radius)
-        y_max = min(H - bbox_h, y0 + search_radius)
-        for yy in range(y_min, y_max + 1):
-            patch = image[yy:yy + bbox_h, x0:x0 + bbox_w]
-            score = float(patch.mean())
-            if score > best_score:
-                best_score = score
-                best_y = yy
-        return best_x, best_y
-
-    else:  # "V"
-        # Suche in x-Richtung (Normalenrichtung)
-        x_min = max(0, x0 - search_radius)
-        x_max = min(W - bbox_w, x0 + search_radius)
-        for xx in range(x_min, x_max + 1):
-            patch = image[y0:y0 + bbox_h, xx:xx + bbox_w]
-            score = float(patch.mean())
-            if score > best_score:
-                best_score = score
-                best_x = xx
-        return best_x, best_y
-
-
-def _snap_to_grid_oriented(
-    x0: int,
-    y0: int,
-    mode: str,
-    orientation: str,
-) -> tuple[int, int]:
-    """
-    Orientierungssensitives Snapping auf das Dimer-Raster.
-
-    - Für H-Terrassen: SNAP aus _MODE_SNAP (dx = TILE_WIDTH, dy = 3/4*TILE_HEIGHT)
-    - Für V-Terrassen: dx/dy vertauscht, weil das Dimer-Template um 90° gedreht wurde
-    """
-    if orientation == "H":
-        dx, dy = _MODE_SNAP[mode]
-    else:
-        # vertikale Terrassen -> Dimer-Template gedreht -> Rasterachsen vertauschen
-        dx, dy = _MODE_SNAP[mode][1], _MODE_SNAP[mode][0]
-
-    sx = ((x0 - _LATTICE_PHASE_X) // dx) * dx + _LATTICE_PHASE_X
-    sy = ((y0 - _LATTICE_PHASE_Y) // dy) * dy + _LATTICE_PHASE_Y
-    return int(sx), int(sy)
 
 
 def _snap_to_grid(x0: int, y0: int, mode: str) -> tuple[int, int]:
@@ -119,11 +49,9 @@ def place_single_defect(canvas, mask, mode: str) -> tuple[np.ndarray, np.ndarray
     H, W = canvas.shape[:2]
     h, w = _MODE_BBOX[mode]
 
-    # Zufallsstart
     x0 = random.randint(0, W - w)
     y0 = random.randint(0, H - h)
 
-    # AUF DIMERRASTER SNAP!!  <-- wichtigste Zeile
     x0, y0 = _snap_to_grid(x0, y0, mode)
     x0, y0 = _clamp_to_fit(H, W, x0, y0, w, h)
 
@@ -136,10 +64,6 @@ def apply_random_signatures(
     mask: np.ndarray,
     n_defects_range=(3, 8),
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Legt mehrere zufällige Defekte (gemischte Typen) auf die Oberfläche.
-    - nutzt place_single_defect -> korrekte Ausrichtung auf dem Dimer-Raster
-    """
     n_def = np.random.randint(n_defects_range[0], n_defects_range[1] + 1)
     modes = ("gaussian", "v1", "v2")
 
@@ -158,19 +82,6 @@ def apply_random_signatures_oriented(
     n_defects_range=(3, 10),
     min_distance_dimers: int = 2,
 ):
-    """
-    Platzierung zufälliger Signaturen auf Terrassen:
-
-    - für v1/v2:
-        * Grid-Snap (MODE_SNAP)
-        * Refinement auf Dimerreihe über _refine_snap_to_dimer_line (Helligkeitsmaximum)
-
-    - für gaussian (1-Dimer):
-        * Grid-Snap
-        * KEIN Helligkeits-Refinement
-        * Stattdessen: Zentrum strikt auf Dimer-Reihe snappen
-          (Reihenabstand = TILE_HEIGHT; Boxhöhe = 3*TILE_HEIGHT)
-    """
     H, W = canvas.shape
     margin_px = min_distance_dimers * TILE_HEIGHT
     n_def = random.randint(*n_defects_range)
@@ -184,12 +95,11 @@ def apply_random_signatures_oriented(
         x = random.randint(0, W - 1)
         y = random.randint(0, H - 1)
 
-        # Welche Terrasse liegt hier?
         t_id = terrace_ids[y, x]
         if t_id < 0:
             continue
 
-        ori = terrace_orient[y, x]   # "H" oder "V"
+        ori = terrace_orient[y, x]   
 
         # BBOX & SNAP je nach Orientierung
         if ori == "H":
@@ -200,7 +110,7 @@ def apply_random_signatures_oriented(
             defect_func = _APPLIERS[mode]
 
         else:  # "V" – vertikale Dimerreihen
-            bbox_h = _MODE_BBOX[mode][1]  # vertauscht
+            bbox_h = _MODE_BBOX[mode][1] 
             bbox_w = _MODE_BBOX[mode][0]
             snap_dx = _MODE_SNAP[mode][1]
             snap_dy = _MODE_SNAP[mode][0]
@@ -211,7 +121,6 @@ def apply_random_signatures_oriented(
                 img2 = np.rot90(img)
                 msk2 = np.rot90(msk)
 
-                # Welt (xx, yy) -> Koordinate im rotierten Bild
                 yy_r = W2 - 1 - xx
                 xx_r = yy
 
@@ -296,7 +205,6 @@ def apply_random_signatures_oriented(
 
             region_ids = terrace_ids[ys:ye, xs:xe]
             if not np.all(region_ids == tid_center):
-                # zu nah an Terrassenkante
                 continue
 
         # -----------------------------

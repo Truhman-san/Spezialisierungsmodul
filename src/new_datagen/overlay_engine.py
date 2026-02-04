@@ -29,7 +29,6 @@ _MODE_SNAP = {
     "v2":       (TILE_WIDTH, 4 * TILE_HEIGHT),
 }
 
-# --- Optionale Tile-Phasen (falls Base-Tile nicht bei (0,0) beginnt) ---
 _LATTICE_PHASE_X = 0
 _LATTICE_PHASE_Y = 0
 
@@ -55,7 +54,6 @@ def place_single_defect(canvas, mask, mode: str) -> tuple[np.ndarray, np.ndarray
     x0 = random.randint(0, W - w)
     y0 = random.randint(0, H - h)
 
-    # AUF DIMERRASTER SNAP!!  <-- wichtigste Zeile
     x0, y0 = _snap_to_grid(x0, y0, mode)
     x0, y0 = _clamp_to_fit(H, W, x0, y0, w, h)
 
@@ -67,13 +65,8 @@ def place_single_defect(canvas, mask, mode: str) -> tuple[np.ndarray, np.ndarray
 def apply_random_signatures(
     canvas: np.ndarray,
     mask: np.ndarray,
-    n_defects_range=(3, 8),   # min 3, max 8 Defekte
+    n_defects_range=(3, 8),  
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Legt mehrere zufällige Defekte (gemischte Typen) auf die Oberfläche.
-    canvas: Bild
-    mask:   Labelbild (0 Background, 1/2/3 Signaturen)
-    """
     H, W = canvas.shape[:2]
 
     n_def = np.random.randint(n_defects_range[0], n_defects_range[1] + 1)
@@ -101,12 +94,10 @@ def apply_random_signatures(
             cls_id = 3
             applier = apply_defect_overlay_v2
 
-        # zufällige Startposition (vor Snap)
+        # zufällige Startposition
         x0 = random.randint(0, max(0, W - w))
         y0 = random.randint(0, max(0, H - h))
 
-        # auf Dimerraster snappen (wie in deinem alten Code)
-        # hier minimal: nur in X auf TILE_WIDTH, in Y auf TILE_HEIGHT oder 3/4*TILE_HEIGHT
         x0 = (x0 // TILE_WIDTH) * TILE_WIDTH
         y0 = (y0 // TILE_HEIGHT) * TILE_HEIGHT
 
@@ -114,13 +105,12 @@ def apply_random_signatures(
         x0 = min(max(0, x0), max(0, W - w))
         y0 = min(max(0, y0), max(0, H - h))
 
-        # anwenden – wichtig: class_id an Overlay übergeben
         canvas, mask = applier(
             canvas,
             mask,
             x0,
             y0,
-            class_id=cls_id,   # sicherstellen, dass die Funktion das unterstützt
+            class_id=cls_id,  
         )
 
     return canvas, mask

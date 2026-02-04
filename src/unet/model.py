@@ -46,12 +46,12 @@ def build_unet(
     u1 = L.Concatenate(name="concat1")([u1, c1])
     d1 = conv_block(u1, base_filters, name="dec1")
 
-    # EINZIGER Head: Multiclass-Segmentierung
+    # einziger Head: Multiclass-Segmentierung
     outputs = L.Conv2D(
         num_classes,
         1,
-        activation="softmax",   # weil du from_logits=False verwendest
-        name="main",            # Name ist egal, Output ist trotzdem ein Tensor, kein Dict
+        activation="softmax",   
+        name="main",          
     )(d1)
 
     model = tf.keras.Model(

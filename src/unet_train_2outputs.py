@@ -17,7 +17,6 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train U-Net (multiclass + optional row head)")
     p.add_argument("--images_dir", type=str, default="data/training_two_outputs/images")
     p.add_argument("--masks_dir", type=str, default="data/training_two_outputs/masks")
-    # NEU: Row-Masken für Dimerreihen (0/1)
     p.add_argument(
         "--row_masks_dir",
         type=str,
@@ -86,7 +85,6 @@ def main():
         cfg.batch_size,
         aug_cfg,
         seed=cfg.random_seed,
-        # WICHTIG: für Multi-Task müssen hier die Row-Masken rein
         row_masks_dir=args.row_masks_dir if multi_task else None,
     )
     train_ds, val_ds, test_ds, *_ = dsb.train_val_test(cfg.val_fraction, cfg.test_fraction)
@@ -106,10 +104,8 @@ def main():
 
     subset_steps = max(1, int(round(train_steps_full * train_fraction)))
 
-    # WICHTIG: DatasetBuilder shuffelt train_ds bereits
     train_ds = train_ds.take(subset_steps)
 
-    # Approx Sample-Anzahlen (nur zur Info / Logging)
     train_size = subset_steps * cfg.batch_size
     val_size   = val_steps * cfg.batch_size
     test_size  = test_steps * cfg.batch_size
@@ -127,9 +123,6 @@ def main():
 
     print(f"[INFO] train_fraction={train_fraction}, approx_train_samples={train_size}")
 
-    # Kein Squeeze mehr nötig:
-    # - focal_plus_dice kann mit [H,W,1]-Masken umgehen (squeezed intern)
-    # - für Row-Head brauchen wir [H,W,1] float 0/1 für BCE
 
     num_classes = getattr(cfg, "num_classes", 4)
 
@@ -143,7 +136,7 @@ def main():
     model = build_unet(
         input_shape=(cfg.image_height, cfg.image_width, cfg.channels),
         num_classes=num_classes,
-        add_row_head=multi_task,   # 2-Head-Modell bei Multi-Task
+        add_row_head=multi_task,   
     )
 
     opt = tf.keras.optimizers.Adam(learning_rate=cfg.learning_rate)
@@ -159,14 +152,13 @@ def main():
     )
 
     if multi_task:
-        # Multi-Output: dict von Losses + Metrics
         losses = {
             "main": main_loss,
             "rows": tf.keras.losses.BinaryCrossentropy(from_logits=False),
         }
         loss_weights = {
             "main": 1.0,
-            "rows": 0.5,   # anpassen nach Geschmack
+            "rows": 0.5,  
         }
         metrics = {
             "main": [
@@ -178,10 +170,8 @@ def main():
                 tf.keras.metrics.MeanIoU(num_classes=2, name="rows_iou"),
             ],
         }
-        # Keras-Metriknamen: "main_mean_iou" -> "val_main_mean_iou"
         monitor_metric = "val_main_mean_iou"
     else:
-        # Rückfall: Single-Head-Setup (wie bisher)
         losses = main_loss
         loss_weights = None
         metrics = [

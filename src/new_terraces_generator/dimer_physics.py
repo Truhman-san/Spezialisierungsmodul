@@ -33,28 +33,24 @@ def build_physical_dimer_tile(
     - B: 0 < B < 1
     - Rückgabe: uint8[9,18] mit 0..255
     """
-    # Parameter einmal pro Bild ziehen, falls nicht vorgegeben
     if A is None:
         A = random.uniform(0.0, 30.0)
     if B is None:
         B = random.uniform(0.00, 1.0)
 
-    # X = 1..18
     x_idx = np.arange(1, TILE_WIDTH + 1, dtype=np.float64)
     zf = _z_factor_x(x_idx, A=A, B=B)  # (18,)
 
     # 9x18: gleiche Modulation für alle Y-Zeilen
-    denom = 1.0 + zf[None, :]          # (1,18) -> broadcast zu (9,18)
+    denom = 1.0 + zf[None, :]          
     z_raw = np.asarray(BASE_TILE_FLOAT, dtype=np.float64)
     z_mod = z_raw / denom
 
-    # Auf [0,1] normalisieren und auf 0..255 skalieren
     z_min = float(z_mod.min())
     z_max = float(z_mod.max())
     if z_max > z_min:
         z_norm = (z_mod - z_min) / (z_max - z_min)
     else:
-        # Degenerierter Fall: alles gleich
         z_norm = np.zeros_like(z_mod, dtype=np.float64)
 
     tile_uint8 = (z_norm * (DTYPE.gray_levels - 1)).astype(DTYPE.gray_dtype, copy=False)

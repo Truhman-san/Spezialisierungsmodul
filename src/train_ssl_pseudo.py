@@ -46,7 +46,6 @@ def _pick_main_output(out):
     if isinstance(out, (list, tuple)):
         return out[0]
     if isinstance(out, dict):
-        # prefer "main" if exists, else first value
         if "main" in out:
             return out["main"]
         return list(out.values())[0]
@@ -60,7 +59,6 @@ def main():
     student = tf.keras.models.load_model(args.model_path, compile=False)
     teacher_mgr = EMATeacher(student, decay=args.ema_decay)
 
-    # stabiler bei wenig Daten:
     opt = tf.keras.optimizers.Adam(args.lr, clipnorm=1.0)
 
     ds_u = build_unlabeled_ds(args.unlabeled_dir, image_size, args.batch_size)
@@ -84,9 +82,6 @@ def main():
             t_probs = _pick_main_output(t_out)
             t_probs = tf.cast(t_probs, tf.float32)
 
-            # sanity: if the model outputs logits by accident, make it probs
-            # (shouldn't happen in your setup, but keeps it robust)
-            # If sums aren't ~1, apply softmax:
             sum_probs = tf.reduce_mean(tf.reduce_sum(t_probs, axis=-1))
             t_probs = tf.cond(
                 tf.logical_or(sum_probs < 0.90, sum_probs > 1.10),
@@ -99,11 +94,9 @@ def main():
             # soft mask
             mask = tf.clip_by_value((conf - tau) / (1.0 - tau + 1e-6), 0.0, 1.0)
 
-            # ignore background in unlabeled loss (recommended in your setting)
             if args.ignore_bg == 1:
                 mask = mask * tf.cast(tf.not_equal(yhat, 0), tf.float32)
 
-            # optional clamp (normally leave at 0)
             if args.mask_floor > 0:
                 mask = tf.minimum(mask, tf.cast(args.mask_floor, tf.float32))
 
@@ -134,7 +127,7 @@ def main():
         keep_hard = tf.reduce_mean(tf.cast(conf > tau, tf.float32))
         keep_soft = tf.reduce_mean(mask)
 
-        # sample label stats (cheap)
+        # sample label stats
         y0 = yhat[0]
         y0_small = y0[::8, ::8]
         uniq = tf.unique(tf.reshape(y0_small, [-1]))[0]

@@ -1,9 +1,3 @@
-# config.py
-# -*- coding: utf-8 -*-
-"""
-Zentrale Konfiguration für die Datengenerierung (STM-Synthese).
-"""
-
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple, Sequence
@@ -17,11 +11,11 @@ TILE_HEIGHT: int = 9
 TILE_WIDTH: int = 18
 
 # (Höhe, Breite) der finalen Samples (z.B. 30x30 nm ≈ 600x600 px)
-CANVAS_SIZE: Tuple[int, int] = (1800, 1800)  # (H, W)
+CANVAS_SIZE: Tuple[int, int] = (1800, 1800) 
 
 
 # ---------------------------
-# Basis-Kachel (Rohdaten, normalisierte Helligkeit ~0..0.1)
+# Basis-Kachel
 # ---------------------------
 
 BASE_TILE_DATA: Tuple[Tuple[float, ...], ...] = (
@@ -75,20 +69,15 @@ BASE_TILE_DATA: Tuple[Tuple[float, ...], ...] = (
 
 @dataclass(frozen=True)
 class DtypeSpec:
-    gray_dtype: np.dtype = np.uint8      # 8-bit Graustufen
-    float_dtype: np.dtype = np.float64   # für Berechnungen
-    gray_levels: int = 256               # 0..255
+    gray_dtype: np.dtype = np.uint8     
+    float_dtype: np.dtype = np.float64   
+    gray_levels: int = 256          
 
 
 DTYPE = DtypeSpec()
 
 
 def build_base_tile(scale_to_uint8: bool = True) -> np.ndarray:
-    """
-    Baut die Basis-Dimer-Kachel als NumPy-Array.
-    - validiert die erwartete Form (9x18)
-    - skaliert auf 0..255 (uint8), wenn gewünscht
-    """
     arr = np.asarray(BASE_TILE_DATA, dtype=DTYPE.float_dtype)
 
     if arr.shape != (TILE_HEIGHT, TILE_WIDTH):
@@ -118,22 +107,17 @@ assert BASE_TILE.shape == TILE_SHAPE
 assert BASE_TILE.dtype == DTYPE.gray_dtype
 assert 0 <= int(BASE_TILE.min()) and int(BASE_TILE.max()) <= 255
 
-# Dimer-Maske (optional, für spätere Defektlogik nützlich)
+# Dimer-Maske
 DIMER_THRESHOLD: float = float(np.percentile(BASE_TILE_FLOAT, 75.0))
 BASE_TILE_DIMER_MASK: np.ndarray = (BASE_TILE_FLOAT >= DIMER_THRESHOLD).astype(np.uint8)
 assert BASE_TILE_DIMER_MASK.shape == TILE_SHAPE
 
-# sehr schmale Maske nur für die Reihen (Kerne der Dimere)
 DIMER_ROW_THRESHOLD: float = float(np.percentile(BASE_TILE_FLOAT, 50.0))
 BASE_TILE_ROW_MASK: np.ndarray = (BASE_TILE_FLOAT >= DIMER_ROW_THRESHOLD).astype(np.uint8)
 assert BASE_TILE_ROW_MASK.shape == TILE_SHAPE
 
 
 def tile_repetitions_for_canvas(canvas_size: Tuple[int, int] | Sequence[int]) -> Tuple[int, int]:
-    """
-    Liefert, wie oft die 9x18-Kachel in (H, W) Richtung wiederholt werden muss,
-    um mindestens die gewünschte Canvas-Größe zu erreichen.
-    """
     H, W = int(canvas_size[0]), int(canvas_size[1])
     reps_h = int(np.ceil(H / TILE_HEIGHT))
     reps_w = int(np.ceil(W / TILE_WIDTH))

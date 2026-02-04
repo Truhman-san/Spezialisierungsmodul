@@ -7,9 +7,6 @@ import matplotlib.pyplot as plt
 
 OUTPUT_ROOT = Path("runs")
 
-# Deine fünf fertigen Ordner:
-# trage hier GENAU die Ordnernamen ein, die entstanden sind,
-# z.B. lc_f10, lc_f25, lc_f50, lc_f75, lc_f100
 RUNS = {
     0.10: "lc_f10",
     0.25: "lc_f25",

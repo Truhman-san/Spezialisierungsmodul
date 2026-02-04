@@ -95,18 +95,16 @@ def main():
         # --- Fallunterscheidung: Single- vs. Multi-Output ---
         if isinstance(pred, dict):
             # Neues Modell: {"main": ..., "rows": ...}
-            probs_main = pred["main"]  # [B,H,W,C]
+            probs_main = pred["main"] 
             # Labels:
             if isinstance(yb, dict):
-                yb_main = yb["main"].numpy()    # [B,H,W,1] int (oder one-hot, aber bei dir int)
+                yb_main = yb["main"].numpy()  
             else:
-                # falls DatasetBuilder doch nur single-task zurückgibt
                 yb_main = yb.numpy()
         else:
             # Altes Modell: ein einziger Tensor
-            probs_main = pred  # [B,H,W,C]
+            probs_main = pred 
             if isinstance(yb, dict):
-                # etwas schräg, aber zur Sicherheit: nimm "main"
                 yb_main = yb["main"].numpy()
             else:
                 yb_main = yb.numpy()
@@ -118,7 +116,7 @@ def main():
             yb_main_cls = yb_main
 
         # argmax über Klassen
-        y_pred_main_cls = np.argmax(probs_main, axis=-1)  # [B,H,W]
+        y_pred_main_cls = np.argmax(probs_main, axis=-1) 
 
         y_true_main_all.append(yb_main_cls)
         y_pred_main_all.append(y_pred_main_cls)
@@ -127,12 +125,12 @@ def main():
         # 1) Multi-Task-Dataset (row_masks_dir gesetzt)
         # 2) Modell tatsächlich einen 'rows'-Output hat
         if multi_task and isinstance(pred, dict) and "rows" in pred and isinstance(yb, dict) and "rows" in yb:
-            probs_rows = pred["rows"]          # [B,H,W,1], Sigmoid
-            yb_rows = yb["rows"].numpy()       # [B,H,W,1] float 0/1
+            probs_rows = pred["rows"]     
+            yb_rows = yb["rows"].numpy()   
 
             # Ground Truth [B,H,W] int 0/1
             y_true_rows = np.squeeze(yb_rows, axis=-1)
-            y_true_rows = (y_true_rows > 0.5).astype(np.uint8)  # falls nicht exakt 0/1
+            y_true_rows = (y_true_rows > 0.5).astype(np.uint8) 
 
             # Prediction [B,H,W] int 0/1
             y_pred_rows = (probs_rows > 0.5).astype(np.uint8)
@@ -142,8 +140,8 @@ def main():
             y_pred_rows_all.append(y_pred_rows)
 
     # --- Flatten für MAIN ---
-    y_true_main = np.concatenate([a.reshape(-1) for a in y_true_main_all], axis=0)  # [N_px]
-    y_pred_main = np.concatenate([a.reshape(-1) for a in y_pred_main_all], axis=0)  # [N_px]
+    y_true_main = np.concatenate([a.reshape(-1) for a in y_true_main_all], axis=0) 
+    y_pred_main = np.concatenate([a.reshape(-1) for a in y_pred_main_all], axis=0) 
 
     # evtl. num_classes bestimmen
     num_classes_cfg = getattr(cfg, "num_classes", None)

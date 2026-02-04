@@ -1,4 +1,3 @@
-# generator.py
 from __future__ import annotations
 import numpy as np
 import cv2
@@ -25,13 +24,6 @@ def _make_oriented_canvas(
     tile_H: np.ndarray,
     tile_V: np.ndarray,
 ) -> np.ndarray:
-    """
-    Baut ein vollflächiges Dimer-Canvas für die gewünschte Orientierung.
-
-    - tile_H: 9x18-Template für horizontale Dimere (Dimerachse entlang X)
-    - tile_V: 9x18-Template für vertikale Dimere (Dimerachse entlang X im Template),
-             wird hier für die Bildorientierung um 90° gedreht.
-    """
     if orientation == DimerOrientation.H:
         base_tile = tile_H
     elif orientation == DimerOrientation.V:
@@ -90,14 +82,13 @@ def build_terraced_dimer_canvas(
 
     # 4) Orientierung pro Terrasse auf Pixel-Ebene abbilden
     orientation_map = np.array(orientations, dtype=object)
-    terrace_orient_pixels = orientation_map[terrace_pixels]  # (H, W), "H" oder "V"
+    terrace_orient_pixels = orientation_map[terrace_pixels]  
 
     # 5) Dimer-Canvases aufbauen
     final_dimer = np.zeros((H, W), dtype=np.uint8)
-    row_mask    = np.zeros((H, W), dtype=np.uint8)  # neue Maske für Dimerreihen
+    row_mask    = np.zeros((H, W), dtype=np.uint8) 
 
     if same_dimer_for_all:
-        # Alter Modus: EIN physikalisches Tile für das ganze Bild
         tile_base = build_physical_dimer_tile()
         canvas_H = _make_oriented_canvas(canvas_size, DimerOrientation.H, tile_base, tile_base)
         canvas_V = _make_oriented_canvas(canvas_size, DimerOrientation.V, tile_base, tile_base)
@@ -137,7 +128,6 @@ def build_terraced_dimer_canvas(
             mask_t = terrace_pixels == t_id
             if mask_t.any():
                 final_dimer[mask_t] = canvas_t[mask_t]
-                # class_id = 1
                 row_mask[mask_t] = np.where(row_t[mask_t] == 1, 1, row_mask[mask_t])
 
     # -------------------------------------------------------
@@ -162,13 +152,12 @@ def build_terraced_dimer_canvas(
     grad_tiles = np.zeros((n_rows_tiles, n_cols_tiles), dtype=np.float32)
 
     if num_steps == 0:
-        # nur eine Terrasse → einfacher linearer Verlauf von oben (hell) nach unten (dunkel)
         col_grad = np.linspace(1.0, 0.0, n_rows_tiles, dtype=np.float32)
         grad_tiles = np.repeat(col_grad[:, None], n_cols_tiles, axis=1)
     else:
         # Gradient pro Terrassen-Fläche
         for t in range(n_terraces):
-            mask_t = terrace_tiles == t  # Tiles, die zu Terrasse t gehören
+            mask_t = terrace_tiles == t  
             if not mask_t.any():
                 continue
 
@@ -197,16 +186,15 @@ def build_terraced_dimer_canvas(
         TILE_WIDTH,
         axis=1,
     )
-    grad_pixels = grad_pixels[:H, :W]  # [0,1], oben hell, unten dunkel
+    grad_pixels = grad_pixels[:H, :W]  
 
-    # 7) Range für Helligkeit festlegen (inkl. Extremfälle)
+    # 7) Range für Helligkeit festlegen
     grad_low = random.uniform(0.0, 60.0)
     grad_high = random.uniform(195.0, 255.0)
     if grad_high <= grad_low:
         grad_high = grad_low + 1.0
     gradient_img = grad_low + (grad_high - grad_low) * grad_pixels
 
-    # optional zweiter Draw (wie in deiner Version)
     grad_low = random.uniform(0.0, 60.0)
     grad_high = random.uniform(195.0, 255.0)
     if grad_high <= grad_low:
@@ -219,7 +207,7 @@ def build_terraced_dimer_canvas(
     out = (1.0 - mix_alpha) * fd + mix_alpha * gradient_img
     out = np.clip(out, 0, 255).astype(np.uint8)
 
-    # Terrassenkanten weichzeichnen (Bild, nicht Maske)
+    # Terrassenkanten weichzeichnen
     out = blur_terrace_edges(
         out,
         terrace_pixels=terrace_pixels,
@@ -355,16 +343,14 @@ def build_rotated_terraced_dimer_canvas(
             pil_tmask = Image.fromarray(sub_terr_mask_u8,  mode="L")
 
             # --- Zufällige Drift-Parameter pro Terrasse ---
-            # Wenn du konstant 6 / 1.5 willst, setz sie einfach fix:
             # max_shift_px = 6.0
             # strength     = 1.5
             max_shift_px = random.uniform(3.0, 8.0)
             strength     = random.uniform(1.0, 1.5)
 
-                        # Flowfeld einmal bauen (deterministisch pro Terrasse)
             Hsub, Wsub = sub_img_base.shape[:2]
 
-            # Seed pro Terrasse (kommt aus Python-random -> reproduzierbar mit deinem globalen Seed)
+            # Seed pro Terrasse 
             seed = random.randint(0, 2**31 - 1)
             rng = np.random.default_rng(seed)
 
@@ -375,13 +361,11 @@ def build_rotated_terraced_dimer_canvas(
                 rng=rng,
             )
 
-            # Anwenden: Bild bilinear, Masken nearest
             sub_img2   = apply_flow_bilinear_u8(sub_img_base.astype(np.uint8), map_x, map_y)
             sub_sig2   = apply_flow_nearest_u8(sub_mask_base.astype(np.uint8), map_x, map_y, border_value=0)
             sub_row2   = apply_flow_nearest_u8(sub_row_base.astype(np.uint8),  map_x, map_y, border_value=0)
             sub_tmask2 = apply_flow_nearest_u8(sub_terr_mask_u8.astype(np.uint8), map_x, map_y, border_value=0)
 
-            # Nur dort zurückschreiben, wo diese (verzerrte) Terrasse wirklich liegt
             sel = sub_tmask2 > 0
 
             img_patch  = img_out[y_min:y_max + 1, x_min:x_max + 1]

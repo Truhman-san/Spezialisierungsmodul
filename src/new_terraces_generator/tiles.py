@@ -1,4 +1,3 @@
-# tiles.py
 from __future__ import annotations
 from typing import Tuple
 import numpy as np
@@ -13,11 +12,6 @@ def make_repeated_tile(
     canvas_size: Tuple[int, int],
     base_tile: np.ndarray | None = None,
 ) -> np.ndarray:
-    """
-    Erzeugt ein periodisch wiederholtes Pattern, das mindestens canvas_size abdeckt.
-    Wichtig: Wiederholungen werden aus der tatsächlichen Tile-Form berechnet,
-    damit auch gedrehte Tiles (z.B. 18x9) korrekt funktionieren.
-    """
     if base_tile is None:
         base_tile = BASE_TILE
 

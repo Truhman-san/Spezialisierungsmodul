@@ -2,8 +2,8 @@ from pathlib import Path
 from PIL import Image
 
 
-ROOT_DIR = Path(__file__).resolve().parent        # <projekt>/src/real_stm
-PROJECT_ROOT = ROOT_DIR.parent.parent             # <projekt>
+ROOT_DIR = Path(__file__).resolve().parent    
+PROJECT_ROOT = ROOT_DIR.parent.parent            
 
 INPUT_DIR = PROJECT_ROOT / "real_stm_raw_tifs"
 OUTPUT_DIR = PROJECT_ROOT / "real_stm_converted_png"

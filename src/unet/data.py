@@ -17,11 +17,10 @@ class DatasetBuilder:
         batch_size: int,
         aug_cfg: dict[str, object] | None = None,
         seed: int = 42,
-        num_classes: int = 4,  # 0..3 (0=BG)
+        num_classes: int = 4,  
         one_hot_masks: bool = False,
-        # --- NEU: zweites Masken-Dir für Dimerreihen (0/1) ---
         row_masks_dir: str | None = None,
-        one_hot_row_masks: bool = False,  # optional
+        one_hot_row_masks: bool = False, 
     ):
         self.images_dir = Path(images_dir)
         self.masks_dir = Path(masks_dir)
@@ -42,14 +41,9 @@ class DatasetBuilder:
     # -------------------------------------------------------------------------
     def _match_image_mask_pairs(self) -> list[tuple[str, ...]]:
         """
-        Bild- und Masken-Paare/-Tripel matchen.
-
-        Aktuelles Schema bei dir:
         - Bilder:        stm_<nummer>.png
         - Hauptmasken:   stm_<nummer>_mask-sig.png
         - Row-Masken:    stm_<nummer>_mask-row.png
-
-        Zusätzlich noch robust gegen andere *_mask* / *_row* Varianten.
         """
         # Alle PNGs rekursiv einsammeln
         img_files = sorted(self.images_dir.rglob("*.png"))
@@ -62,7 +56,6 @@ class DatasetBuilder:
 
         def norm_main_key(p: Path) -> str:
             """
-            Alles vor '_mask' verwenden:
             stm_000123_mask-sig  -> stm_000123
             stm_000123_mask      -> stm_000123
             stm_000123_maskXYZ   -> stm_000123
@@ -87,7 +80,6 @@ class DatasetBuilder:
                 return key[: -len("_rowmask")]
             if key.endswith("_row"):
                 return key[: -len("_row")]
-            # Fallback: alles vor erstem '_row'
             if "_row" in key:
                 key = key.split("_row", 1)[0]
             return key
@@ -105,7 +97,6 @@ class DatasetBuilder:
             msk_by_key[key] = p
 
         if self.row_masks_dir is None:
-            # Nur Bild + Hauptmaske
             common_keys = sorted(set(img_by_key.keys()) & set(msk_by_key.keys()))
             pairs = [(str(img_by_key[k]), str(msk_by_key[k])) for k in common_keys]
         else:
@@ -128,7 +119,6 @@ class DatasetBuilder:
             ]
 
         if not pairs:
-            # Kleines Debug-Logging, falls wieder nichts passt
             msg = (
                 "No matching PNG filenames found between images_dir, masks_dir "
                 "und ggf. row_masks_dir.\n"
@@ -156,14 +146,13 @@ class DatasetBuilder:
         msk_bytes = tf.io.read_file(msk_path)
 
         # 1-Kanal lesen
-        img = tf.image.decode_png(img_bytes, channels=1)  # uint8
-        msk = tf.image.decode_png(msk_bytes, channels=1)  # uint8 (Werte: 0..C-1)
+        img = tf.image.decode_png(img_bytes, channels=1)  
+        msk = tf.image.decode_png(msk_bytes, channels=1)  
 
         # Bild normalisieren
-        img = tf.image.convert_image_dtype(img, tf.float32)  # [0,1]
+        img = tf.image.convert_image_dtype(img, tf.float32)  
 
-        # Maske als int behalten (keine Binarisierung!)
-        msk = tf.cast(msk, tf.int32)  # 0..C-1 int
+        msk = tf.cast(msk, tf.int32)  
 
         # Resize
         h, w = self.image_size
@@ -172,12 +161,11 @@ class DatasetBuilder:
 
         # Optional: one-hot für Hauptmaske
         if self.one_hot_masks:
-            msk_2d = tf.squeeze(msk, axis=-1)  # [H,W]
+            msk_2d = tf.squeeze(msk, axis=-1) 
             msk = tf.one_hot(
                 msk_2d, depth=self.num_classes, dtype=tf.float32
-            )  # [H,W,C]
+            )  
         else:
-            # Sparse Pfad: [H,W,1] int32
             pass
 
         return img, msk
@@ -190,31 +178,27 @@ class DatasetBuilder:
     ) -> tuple[tf.Tensor, dict[str, tf.Tensor]]:
         """
         Multi-Task:
-        - "main": mehrklassige Defektmaske (wie bisher)
+        - "main": mehrklassige Defektmaske 
         - "rows": Binärmaske 0/1 für Dimerreihen
         """
-        # Erst die normale Maske laden / normalisieren
         img, main_mask = self._parse_png_pair(img_path, msk_path)
 
         # Row-Maske laden
         row_bytes = tf.io.read_file(row_path)
-        row = tf.image.decode_png(row_bytes, channels=1)  # uint8
+        row = tf.image.decode_png(row_bytes, channels=1) 
         row = tf.cast(row, tf.int32)
 
         h, w = self.image_size
         row = tf.image.resize(row, (h, w), method="nearest")
 
-        # Alles >0 als 1 interpretieren
         row = tf.where(row > 0, 1, 0)
 
         if self.one_hot_row_masks:
-            row_2d = tf.squeeze(row, axis=-1)  # [H,W]
-            row = tf.one_hot(row_2d, depth=2, dtype=tf.float32)  # [H,W,2]
+            row_2d = tf.squeeze(row, axis=-1)  
+            row = tf.one_hot(row_2d, depth=2, dtype=tf.float32)  
         else:
-            # Für BCE mit Logits ist float [0,1] üblich
-            row = tf.cast(row, tf.float32)  # [H,W,1]
+            row = tf.cast(row, tf.float32)  
 
-        # WICHTIG: Dict-Struktur, die mit Output-Namen deines Modells matcht
         labels = {
             "main": main_mask,
             "rows": row,
@@ -222,10 +206,9 @@ class DatasetBuilder:
         return img, labels
 
     # -------------------------------------------------------------------------
-    # Augmentierung (auf Bilder + Labels, egal ob single- oder multi-task)
+    # Augmentierung 
     # -------------------------------------------------------------------------
     def _apply_to_labels(self, labels, fn):
-        """Hilfsfunktion: wende fn auf Maske(n) an, egal ob Tensor oder Dict."""
         if isinstance(labels, dict):
             return {k: fn(v) for k, v in labels.items()}
         else:
@@ -328,7 +311,6 @@ class DatasetBuilder:
                 num_parallel_calls=AUTOTUNE,
             )
 
-        # Performance: nondeterministic map erlaubt besseres Pipelining
         options = tf.data.Options()
         options.experimental_deterministic = False
         ds = ds.with_options(options)

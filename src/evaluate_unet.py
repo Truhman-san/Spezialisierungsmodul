@@ -7,7 +7,6 @@ import json
 import numpy as np
 import tensorflow as tf
 
-# Falls dein Paket "src" heißt wie im Training:
 from src.unet.config import Config
 from src.unet.data import DatasetBuilder
 
@@ -31,7 +30,6 @@ def make_test_dataset(cfg: Config) -> tf.data.Dataset:
         seed=cfg.random_seed,
     )
     _, _, test_ds, *_ = dsb.train_val_test(cfg.val_fraction, cfg.test_fraction)
-    # Sparse-CE & Metrics erwarten [B,H,W] int:
     test_ds = test_ds.map(lambda i, m: (i, tf.squeeze(m, axis=-1)))
     return test_ds
 
@@ -73,13 +71,13 @@ def main():
     # --- Vorhersagen sammeln ---
     y_true_all, y_pred_all = [], []
     for xb, yb in test_ds:
-        probs = model.predict(xb, verbose=0)            # [B,H,W,C]
-        y_pred_cls = np.argmax(probs, axis=-1)          # [B,H,W]
-        y_true_all.append(yb.numpy())                   # [B,H,W]
+        probs = model.predict(xb, verbose=0)          
+        y_pred_cls = np.argmax(probs, axis=-1)      
+        y_true_all.append(yb.numpy())             
         y_pred_all.append(y_pred_cls)
 
-    y_true = np.concatenate([a.reshape(-1) for a in y_true_all], axis=0)  # [N_px]
-    y_pred = np.concatenate([a.reshape(-1) for a in y_pred_all], axis=0)  # [N_px]
+    y_true = np.concatenate([a.reshape(-1) for a in y_true_all], axis=0)  
+    y_pred = np.concatenate([a.reshape(-1) for a in y_pred_all], axis=0)  
 
     # --- Kennzahlen ---
     # sklearn für Precision/Recall/F1 pro Klasse
@@ -95,7 +93,7 @@ def main():
     # 1) JSON
     out_json = {
         "labels": labels,
-        "classification_report": report,   # enthält precision/recall/f1 und support pro Klasse
+        "classification_report": report, 
         "confusion_matrix": cm.tolist(),
         "iou_per_class": {str(k): float(v) for k, v in zip(labels, iou_per_class)},
         "mean_iou": miou,

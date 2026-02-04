@@ -6,15 +6,13 @@ import tensorflow as tf
 from PIL import Image
 import matplotlib.patches as mpatches
 
-from src.predictions.utils import load_png_gray  # (H,W,1) float32, [0,1]
+from src.predictions.utils import load_png_gray 
 
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
-# Row-Multitask-Modell
 ROWS_PATH   = PROJECT_ROOT / "runs" / "multitask_test" / "model_final.keras"
 
-# Die beiden Defekt-Modelle aus deinem Ensemble-Skript
 MODEL1_PATH = PROJECT_ROOT / "runs" / "ng_f60" / "model_final.keras"
 MODEL2_PATH = PROJECT_ROOT / "runs" / "ngns_f80" / "model_final.keras"
 
@@ -53,7 +51,6 @@ def boost_2dimer_along_rows(
 
     p2 = p_ens[..., CLASS_IDX_2DIMER]  # 2-Dimer-Wahrscheinlichkeiten
 
-    # Kandidaten: Pixel auf (oder sehr nah an) Reihen mit genügend 2-Dimer-Signal
     candidates = (
         (row_prob > th_row_prob) &          # Row-Head ist sich sicher
         (row_mask.astype(bool)) &           # Pixel liegt in der Row-Maske
@@ -73,18 +70,17 @@ def ensemble_defect_predict(image_tf):
         final_pred: (H,W) uint8 (Klassenlabels nach Heuristiken)
         p_ens:      (H,W,C) float32 (gemittelte Probabilities)
     """
-    x = tf.expand_dims(image_tf, axis=0)  # (1,H,W,1)
+    x = tf.expand_dims(image_tf, axis=0)
 
     # Vorhersagen beider Modelle
-    logits1 = model1.predict(x, verbose=0)[0]  # (H,W,C)
-    logits2 = model2.predict(x, verbose=0)[0]  # (H,W,C)
+    logits1 = model1.predict(x, verbose=0)[0]  
+    logits2 = model2.predict(x, verbose=0)[0] 
 
-    # Wenn letzter Layer Softmax ist, sind das schon Wahrscheinlichkeiten
     p1 = logits1
     p2 = logits2
 
-    pred1 = np.argmax(p1, axis=-1).astype(np.uint8)   # (H,W)
-    conf1 = np.max(p1, axis=-1).astype(np.float32)    # (H,W)
+    pred1 = np.argmax(p1, axis=-1).astype(np.uint8)   
+    conf1 = np.max(p1, axis=-1).astype(np.float32)   
 
     pred2 = np.argmax(p2, axis=-1).astype(np.uint8)
     conf2 = np.max(p2, axis=-1).astype(np.float32)
@@ -137,8 +133,8 @@ def predict_pipeline(image_tf):
         p_ens:       (H,W,C) Probabilities (vom Defektensemble)
         p_base:      (H,W,C) ungeänderte Ensemble-Probabilities
     """
-    img_np = np.array(image_tf.numpy(), dtype=np.float32)  # (H,W,1)
-    x = np.expand_dims(img_np, axis=0)  # (1,H,W,1)
+    img_np = np.array(image_tf.numpy(), dtype=np.float32)  
+    x = np.expand_dims(img_np, axis=0)  
 
     # --- Stage 1: Rows aus Multitask-Modell ---
     preds_row = row_model.predict(x, verbose=0)
@@ -153,8 +149,7 @@ def predict_pipeline(image_tf):
     row_mask = (row_prob > 0.5).astype(np.uint8)
 
     # --- Stage 2: Ensemble-Defekte (ohne hartes Gating) ---
-    # final_pred kannst du ignorieren, wir arbeiten mit p_ens
-    _, p_ens = ensemble_defect_predict(image_tf)  # (H,W), (H,W,C)
+    _, p_ens = ensemble_defect_predict(image_tf) 
 
     # Basisprediction des Ensembles
     pred_base = np.argmax(p_ens, axis=-1).astype(np.uint8)
@@ -194,8 +189,8 @@ def main():
         base_name = img_path.stem
         print(f"[{idx}/{n_total}] {base_name}")
 
-        image_tf = load_png_gray(img_path)        # (H,W,1)
-        img_model = image_tf.numpy()[..., 0]      # (H,W)
+        image_tf = load_png_gray(img_path)    
+        img_model = image_tf.numpy()[..., 0]     
         gray_arr = np.array(Image.open(img_path))
 
         # --- Pipeline aufrufen ---

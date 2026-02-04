@@ -10,8 +10,8 @@ class Config:
     masks_dir: str = "data/seventh_training/masks"
     image_height: int = 600
     image_width: int = 600
-    channels: int = 1 # grayscale
-    num_classes: int = 4 # background + 3 defect types
+    channels: int = 1 
+    num_classes: int = 4 
 
     # Split
     val_fraction: float = 0.1
@@ -28,14 +28,14 @@ class Config:
     aug_flip_h: bool = True
     aug_flip_v: bool = False
     aug_random_zoom: bool = True
-    aug_zoom_range: float = 0.1 # ±10%
+    aug_zoom_range: float = 0.1 
 
     # Checkpoints / logging
     output_root: str = "runs"
-    run_name: str | None = None # if None -> auto timestamp
+    run_name: str | None = None 
 
     # Compute
-    use_mixed_precision: bool = False # keep false to match baseline numerics
+    use_mixed_precision: bool = False 
 
     def output_dir(self) -> Path:
         name = self.run_name or f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

@@ -20,7 +20,7 @@ ALL_PERTURBATIONS = [
     "white_artifacts",
 ]
 
-# Flags, die den Ordner definieren (alles andere kann innerhalb des Ordners variieren)
+# Flags, die den Ordner definieren 
 FOLDER_BASE_FLAGS = [
     "xy",
     "zones",
@@ -169,7 +169,6 @@ def main() -> None:
     base_out: Path = args.base_out_dir
     base_out.mkdir(parents=True, exist_ok=True)
 
-    # Entscheide: Auto-Modus oder manueller Modus?
     manual_mode = not (args.enable is None and args.disable is None)
 
     if manual_mode:
@@ -181,7 +180,6 @@ def main() -> None:
         print("MANUELLER MODUS")
         print(f"Aktive Störungen (fix für diesen Ordner): {sorted(enabled)}")
 
-        # Ordnername: hier inkl. tilt/osc, wenn aktiviert
         folder_name = build_folder_name(
             args.prefix,
             enabled_base=enabled,
@@ -195,7 +193,6 @@ def main() -> None:
         print("AUTO-MODUS: erzeuge alle Kombinationen der Basis-Flags")
         variants = []
         for enabled_base in auto_mode_folder_variants():
-            # In Auto-Modus sind tilt/osc NICHT im Ordnernamen kodiert
             folder_name = build_folder_name(
                 args.prefix,
                 enabled_base=enabled_base,
@@ -211,8 +208,8 @@ def main() -> None:
 
     for folder_idx, (folder_name, enabled_base) in enumerate(variants):
         image_root     = base_out / "images"
-        mask_root_sig  = base_out / "masks"       # Signaturmasken
-        mask_root_row  = base_out / "masks_row"   # Dimerreihenmasken
+        mask_root_sig  = base_out / "masks"      
+        mask_root_row  = base_out / "masks_row" 
 
         img_dir      = image_root    / folder_name
         msk_sig_dir  = mask_root_sig / folder_name
@@ -229,13 +226,10 @@ def main() -> None:
         print(f"Basis-Flags in diesem Ordner: {sorted(enabled_base)}")
 
         for i in range(args.n_per_folder):
-            # Im Auto-Modus dürfen tilt/osc pro Bild variieren,
-            # ohne eigenen Ordner zu bekommen.
             if manual_mode:
                 enabled = set(enabled_base)
             else:
                 enabled = set(enabled_base)
-                # tilt/osc zufällig wählen (z.B. 50/50)
                 if random.random() < 0.5:
                     enabled.add("tilt")
                 if random.random() < 0.5:

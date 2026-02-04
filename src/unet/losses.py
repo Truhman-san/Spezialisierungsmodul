@@ -1,11 +1,9 @@
 import tensorflow as tf
 
 def sparse_ce(from_logits: bool = False):
-    """Standard-Loss für Multiclass-Segmentation mit Integer-Masken."""
     return tf.keras.losses.SparseCategoricalCrossentropy(from_logits=from_logits)
 
 def multiclass_dice_loss(y_true, y_pred, num_classes: int, from_logits: bool = False, smooth: float = 1.0):
-    """Einfaches Multiclass-Dice. Optional – nur nutzen, wenn du es willst."""
     if y_true.shape.rank == 4 and y_true.shape[-1] == 1:
         y_true = tf.squeeze(y_true, axis=-1)
     if from_logits:
@@ -41,7 +39,6 @@ def sparse_focal_loss(
     - y_pred: Logits oder Softmax-Outputs (B, H, W, C)
     """
     def loss(y_true, y_pred):
-        # y_true ggf. (B, H, W, 1) -> (B, H, W)
         if y_true.shape.rank == 4 and y_true.shape[-1] == 1:
             y_true_ = tf.squeeze(y_true, axis=-1)
         else:
@@ -128,15 +125,13 @@ def masked_focal_plus_dice(
     eps = 1e-7
 
     def loss(y_true, y_pred):
-        # y_true: (B,H,W) oder (B,H,W,1)
         if y_true.shape.rank == 4 and y_true.shape[-1] == 1:
-            y_true = tf.squeeze(y_true, axis=-1)  # (B,H,W)
+            y_true = tf.squeeze(y_true, axis=-1)  
 
         y_true = tf.cast(y_true, tf.int32)
-        valid = tf.not_equal(y_true, ignore_index)            # (B,H,W) bool
+        valid = tf.not_equal(y_true, ignore_index)            
         valid_f = tf.cast(valid, tf.float32)
 
-        # ersetze ignore pixel durch 0, damit one_hot / indexing nicht crasht
         y_true_safe = tf.where(valid, y_true, 0)
 
         # Softmax falls logits
@@ -146,8 +141,8 @@ def masked_focal_plus_dice(
             y_prob = y_pred
 
         # === FOCAL (sparse) ===
-        y_true_oh = tf.one_hot(y_true_safe, depth=num_classes, dtype=tf.float32)  # (B,H,W,C)
-        p_t = tf.reduce_sum(y_true_oh * y_prob, axis=-1)                          # (B,H,W)
+        y_true_oh = tf.one_hot(y_true_safe, depth=num_classes, dtype=tf.float32) 
+        p_t = tf.reduce_sum(y_true_oh * y_prob, axis=-1)                       
         p_t = tf.clip_by_value(p_t, eps, 1.0 - eps)
 
         ce = -tf.math.log(p_t)
@@ -162,7 +157,7 @@ def masked_focal_plus_dice(
 
         # === DICE (multiclass) ===
         # nur gültige Pixel zählen
-        inter = tf.reduce_sum(y_true_oh * y_prob * valid_f[..., None], axis=(0,1,2))  # (C,)
+        inter = tf.reduce_sum(y_true_oh * y_prob * valid_f[..., None], axis=(0,1,2)) 
         true_sum = tf.reduce_sum(y_true_oh * valid_f[..., None], axis=(0,1,2))
         pred_sum = tf.reduce_sum(y_prob * valid_f[..., None], axis=(0,1,2))
         dice = (2.0 * inter + 1.0) / (true_sum + pred_sum + 1.0)

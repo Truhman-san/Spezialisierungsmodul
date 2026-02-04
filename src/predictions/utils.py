@@ -15,11 +15,10 @@ def load_png_gray(path: Path) -> tf.Tensor:
 def load_mask_labels(path: Path) -> np.ndarray:
     """
     Maske laden, als Integer-Labelmap (0..K-1).
-    Wir gehen davon aus, dass die PNG direkt Klassenlabels 0..3 enthält.
     """
     raw = tf.io.read_file(str(path))
-    mask = tf.image.decode_png(raw, channels=1)  # (H,W,1), dtype uint8/int
-    mask = tf.squeeze(mask, axis=-1)            # (H,W)
+    mask = tf.image.decode_png(raw, channels=1) 
+    mask = tf.squeeze(mask, axis=-1)          
     return mask.numpy()
 
 
@@ -28,11 +27,6 @@ def plot_image_and_labels(image: np.ndarray,
                           pred_labels: np.ndarray,
                           save_path: Path,
                           title: str = ""):
-    """
-    Bild, GT-Labelmap und Pred-Labelmap nebeneinander plotten.
-    image: (H,W) oder (H,W,1)
-    gt_labels/pred_labels: (H,W) mit Werten 0..4
-    """
     if image.ndim == 3 and image.shape[-1] == 1:
         image = image[..., 0]
 
@@ -42,7 +36,6 @@ def plot_image_and_labels(image: np.ndarray,
     axes[0].set_title("Image")
     axes[0].axis("off")
 
-    # 5 Klassen: 0..4
     vmin, vmax = 0, 4
 
     im1 = axes[1].imshow(gt_labels, cmap="tab10", origin="lower", vmin=vmin, vmax=vmax)

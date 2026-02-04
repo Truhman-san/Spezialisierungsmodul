@@ -1,4 +1,3 @@
-# src/ssl/pseudo_label.py
 from __future__ import annotations
 import tensorflow as tf
 

@@ -82,10 +82,8 @@ def main():
 
     subset_steps = max(1, int(round(train_steps_full * train_fraction)))
 
-    # WICHTIG: DatasetBuilder sollte train_ds vorher schon geshuffelt haben
     train_ds = train_ds.take(subset_steps)
 
-    # Approx Sample-Anzahlen (nur zur Info / Logging)
     train_size = subset_steps * cfg.batch_size
     val_size   = val_steps * cfg.batch_size
     test_size  = test_steps * cfg.batch_size
@@ -104,7 +102,6 @@ def main():
     print(f"[INFO] train_fraction={train_fraction}, approx_train_samples={train_size}")
 
 
-    # >>> SparseCE erwartet y_true als [B,H,W] (int). Squeeze die Masken.
     squeeze = lambda i, m: (i, tf.squeeze(m, axis=-1))
     train_ds = train_ds.map(squeeze)
     val_ds   = val_ds.map(squeeze)

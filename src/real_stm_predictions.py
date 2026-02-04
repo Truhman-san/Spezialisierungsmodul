@@ -8,9 +8,8 @@ from PIL import Image
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 
-from src.predictions.utils import load_png_gray  # (H,W,1) float32, [0,1]
+from src.predictions.utils import load_png_gray
 
-# Ordner, in dem dieses Skript liegt: <projekt>/src
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
@@ -24,8 +23,8 @@ def tif_to_colormap_png(tif_path, cmap_name="inferno"):
     if img.mode != "L":
         img = img.convert("L")
 
-    raw = np.array(img).astype(np.float32)  # 0..255
-    raw_norm = raw / 255.0                  # 0..1
+    raw = np.array(img).astype(np.float32)  
+    raw_norm = raw / 255.0                  
 
     cmap = cm.get_cmap(cmap_name)
     colored = cmap(raw_norm)[..., :3]
@@ -60,16 +59,16 @@ def main():
             orig_arr = None
 
         # Modell-Input
-        image_tf = load_png_gray(img_path)        # (H,W,1), float32, [0,1]
-        img_model = image_tf.numpy()[..., 0]      # für Anzeige Panel 3
+        image_tf = load_png_gray(img_path)      
+        img_model = image_tf.numpy()[..., 0]     
 
         # Graustufenbild für Panel 2
-        gray_arr = np.array(Image.open(img_path))  # (H,W) uint8
+        gray_arr = np.array(Image.open(img_path)) 
 
         # Prediction
         pred_logits = model.predict(
             tf.expand_dims(image_tf, axis=0), verbose=0
-        )[0]  # (H,W,C)
+        )[0] 
 
         pred_labels = np.argmax(pred_logits, axis=-1).astype(np.uint8)
 

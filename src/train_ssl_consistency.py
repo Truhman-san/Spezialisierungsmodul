@@ -33,8 +33,8 @@ def parse_args():
     p.add_argument("--debug_every", type=int, default=100)
 
     p.add_argument("--bg_w", type=float, default=0.2)          # weight für Background-Pixel im SSL-Loss
-    p.add_argument("--target_fg", type=float, default=0.08)    # z.B. 0.07..0.10 => 90..93% BG
-    p.add_argument("--beta_area", type=float, default=0.05)    # Stärke der Area-Regularisierung (0.01..0.1)
+    p.add_argument("--target_fg", type=float, default=0.08)  
+    p.add_argument("--beta_area", type=float, default=0.05)  
 
     return p.parse_args()
 
@@ -93,25 +93,25 @@ def main():
             p_s = _ensure_probs(_pick_main_output(model(x_s, training=True)))
 
             # pseudo-label + confidence from weak
-            conf = tf.reduce_max(p_w, axis=-1)  # (B,H,W)
-            yhat = tf.argmax(p_w, axis=-1, output_type=tf.int32)  # (B,H,W)
+            conf = tf.reduce_max(p_w, axis=-1)  
+            yhat = tf.argmax(p_w, axis=-1, output_type=tf.int32) 
 
             # gate: confident pixels
             mask = tf.cast(conf > tau, tf.float32)
 
-            # Background bleibt drin, aber schwächer gewichtet (Anti-Halluzinations-Bremse)
+            # Background bleibt drin, aber schwächer gewichtet
             mask = mask * tf.where(tf.equal(yhat, 0), tf.cast(args.bg_w, tf.float32), 1.0)
 
 
-            # consistency via CE to pseudo-labels (robust when probs are near one-hot)
+            # consistency via CE to pseudo-labels 
             ce = tf.keras.losses.sparse_categorical_crossentropy(
                 yhat, p_s, from_logits=False
-            )  # (B,H,W)
+            ) 
 
             denom = tf.reduce_sum(mask) + 1e-6
             loss_u = tf.reduce_sum(ce * mask) / denom
             # Area regularizer: target foreground fraction (1 - p_bg)
-            p_bg = p_s[..., 0]  # Klasse 0 = Background
+            p_bg = p_s[..., 0]  
             mean_fg = tf.reduce_mean(1.0 - p_bg)
             loss_area = tf.square(mean_fg - tf.cast(args.target_fg, tf.float32))
 
@@ -125,7 +125,7 @@ def main():
         keep = tf.reduce_mean(mask)
         bg_ratio = tf.reduce_mean(tf.cast(tf.equal(yhat, 0), tf.float32))
 
-        # confidence/entropy on student probs (proxy)
+        # confidence/entropy on student probs 
         mean_conf_s = tf.reduce_mean(tf.reduce_max(p_s, axis=-1))
         entropy_s = -tf.reduce_mean(
             tf.reduce_sum(p_s * tf.math.log(tf.clip_by_value(p_s, 1e-6, 1.0)), axis=-1)

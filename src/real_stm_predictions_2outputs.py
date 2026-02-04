@@ -7,9 +7,8 @@ import tensorflow as tf
 from PIL import Image
 import matplotlib.patches as mpatches
 
-from src.predictions.utils import load_png_gray  # (H,W,1) float32, [0,1]
+from src.predictions.utils import load_png_gray 
 
-# Ordner, in dem dieses Skript liegt: <projekt>/src
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
@@ -33,7 +32,6 @@ def main():
         print("Keine Realbilder gefunden. Abbruch.")
         return
 
-    # Grobe Prüfung, ob Rows-Head existiert
     has_rows_head = False
     if isinstance(model.output, dict):
         has_rows_head = "rows" in model.output
@@ -47,11 +45,9 @@ def main():
         print(f"[{idx}/{n_total}] {base_name}")
 
         # Modell-Input
-        image_tf = load_png_gray(img_path)        # (H,W,1), float32, [0,1]
-        img_model = image_tf.numpy()[..., 0]      # für Anzeige in den Panels
-
-        # Graustufenbild (PNG) für linkes Panel
-        gray_arr = np.array(Image.open(img_path))  # (H,W) uint8
+        image_tf = load_png_gray(img_path)       
+        img_model = image_tf.numpy()[..., 0]    
+        gray_arr = np.array(Image.open(img_path)) 
 
         # Prediction
         pred_raw = model.predict(
@@ -61,17 +57,17 @@ def main():
         # --- Multi- vs Single-Output ---
         if isinstance(pred_raw, dict):
             # Multi-Task-Modell
-            pred_main_logits = pred_raw["main"][0]  # (H,W,C)
+            pred_main_logits = pred_raw["main"][0]  
             pred_rows_probs = None
             if has_rows_head and "rows" in pred_raw:
-                pred_rows_probs = pred_raw["rows"][0, ..., 0]  # (H,W)
+                pred_rows_probs = pred_raw["rows"][0, ..., 0] 
         else:
             # Single-Output-Modell
-            pred_main_logits = pred_raw[0]  # (H,W,C)
+            pred_main_logits = pred_raw[0] 
             pred_rows_probs = None
 
         # Klassenlabels (main-Head)
-        pred_labels = np.argmax(pred_main_logits, axis=-1).astype(np.uint8)  # (H,W)
+        pred_labels = np.argmax(pred_main_logits, axis=-1).astype(np.uint8)  
 
         # Anzahl Spalten dynamisch: ohne rows 2 Panels, mit rows 3 Panels
         n_cols = 3 if pred_rows_probs is not None else 2
@@ -120,15 +116,14 @@ def main():
         ax_main.legend(handles=handles_main, loc="upper right", fontsize=8)
 
         # -----------------------------
-        # Panel 3: Dimerreihen-Vorhersage (rows-Head), falls vorhanden
+        # Panel 3: Dimerreihen-Vorhersage (rows-Head)
         # -----------------------------
         if ax_rows is not None and pred_rows_probs is not None:
             ax_rows.imshow(img_model, cmap="gray", origin="lower")
 
-            rows_mask = pred_rows_probs > 0.5  # (H,W) bool
+            rows_mask = pred_rows_probs > 0.5 
 
             overlay_rows = np.zeros((H, W, 4), dtype=np.float32)
-            # Blau halbtransparent
             overlay_rows[rows_mask] = (0.0, 0.5, 1.0, 0.4)
 
             ax_rows.imshow(overlay_rows, origin="lower")

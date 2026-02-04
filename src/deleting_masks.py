@@ -1,12 +1,11 @@
 from pathlib import Path
 
-# === Pfade anpassen ===
-IMAGES_DIR = Path("D:\\Studium\\Semester 3\\Project Data Analytics\\stm_generation\\stm_dataset\\images")   # Oberordner
-MASKS_DIR  = Path("D:\\Studium\\Semester 3\\Project Data Analytics\\stm_generation\\stm_dataset\\masks")    # Oberordner
+IMAGES_DIR = Path("D:\\Studium\\Semester 3\\Project Data Analytics\\stm_generation\\stm_dataset\\images") 
+MASKS_DIR  = Path("D:\\Studium\\Semester 3\\Project Data Analytics\\stm_generation\\stm_dataset\\masks")   
 OUTPUT_TXT = Path("deleted_masks.txt")
 
 # 1) Alle Bilddateien rekursiv einsammeln
-image_files = list(IMAGES_DIR.rglob("*.*"))  # png/jpg/tif/etc
+image_files = list(IMAGES_DIR.rglob("*.*")) 
 image_stems = {p.stem for p in image_files if p.is_file()}
 
 print(f"{len(image_stems)} Bild-Basenamen gefunden.")
@@ -21,7 +20,7 @@ for m in mask_files:
 
     if m.stem not in image_stems:
         deleted.append(str(m))
-        m.unlink()  # --> löscht die Datei
+        m.unlink() 
 
 print(f"{len(deleted)} Masken ohne zugehöriges Bild gelöscht.")
 

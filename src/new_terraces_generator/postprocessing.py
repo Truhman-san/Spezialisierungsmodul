@@ -11,18 +11,6 @@ def blur_terrace_edges(
     edge_band_px: int = 9,
     blur_ksize: int = 9,
 ) -> np.ndarray:
-    """
-    Weicht die Terrassenkanten etwas auf, ohne das ganze Bild zu verwischen.
-
-    - edge_band_px: Breite der Übergangszone um die Kante (in Pixeln)
-    - blur_ksize: Kernelgröße für Gaussian-Blur (muss ungerade sein)
-
-    Strategie:
-    1) Kanten auf Basis von terrace_pixels finden
-    2) Distanz zur Kante berechnen
-    3) Weights 0..1 im Band um die Kante
-    4) Originalbild mit geblurrter Version entlang der Kanten mischen
-    """
     import cv2
 
     img = image.astype(np.float32)
@@ -43,13 +31,10 @@ def blur_terrace_edges(
     edge_uint8[edge] = 255  # Kanten = 255
 
     # --- 2) Distanz zur Kante ---
-    # Für distanceTransform sollen Nicht-Kanten 255, Kanten 0 sein
     inv_edge = np.where(edge_uint8 > 0, 0, 255).astype(np.uint8)
     dist = cv2.distanceTransform(inv_edge, distanceType=cv2.DIST_L2, maskSize=3)
 
     # --- 3) Weights 0..1 im Band um die Kante ---
-    # dist = 0  -> direkt an der Kante
-    # dist >= edge_band_px -> weit weg
     weights = (edge_band_px - dist) / float(edge_band_px)
     weights = np.clip(weights, 0.0, 1.0)
 
@@ -59,7 +44,6 @@ def blur_terrace_edges(
 
     blurred = cv2.GaussianBlur(img, (blur_ksize, blur_ksize), 0)
 
-    # falls Bild 2D ist: Weights 2D, sonst anpassen
     if img.ndim == 2:
         w = weights
     else:
@@ -80,21 +64,6 @@ def apply_surface_tilt_and_oscillation(
     A: float | None = None,
     L: float | None = None,
 ) -> np.ndarray:
-    """
-    Globale Schräge (Tilt) und/oder langsame Oszillation auf das STM-Bild legen.
-
-    - image: uint8 [0..255], 2D
-    - Rückgabe: uint8 [0..255]
-
-    Parameter (typische Ranges, wenn None):
-      * Tilt:
-        - C: Richtung der Schräge (0..2π)
-        - B: Steigung ~ [-1e-4, 1e-4]
-        - H: globaler Offset ~ [-0.03, 0.03]
-      * Oszillation:
-        - A: Amplitude ~ [0.01, 0.03] (entspricht ~3–8 Graustufen)
-        - L: Wellenlänge ~ [0.5*min(H,W), 2*min(H,W)]
-    """
 
     # In [0,1] normalisieren
     image_norm = image.astype(np.float64) / 255.0
@@ -159,14 +128,6 @@ def apply_dimer_amplitude_noise(
     sigma: float = 0.06,
     blur_ksize: int = 3,
 ) -> np.ndarray:
-    """
-    Legt ein weiches 2D-Noisefeld auf die Dimeramplitude.
-
-    - sigma: Stärke der Amplitudenschwankung (≈ 0.03–0.10 sinnvoll)
-    - blur_ksize: bestimmt die Korrelation (3 -> 1–3 px, also gut für DL)
-
-    Ergebnis: lokale Variation der Dimerhöhe, ohne Kanten zu verschmieren.
-    """
     import cv2
 
     img = image.astype(np.float32) / 255.0
@@ -188,7 +149,6 @@ def apply_dimer_amplitude_noise(
     # Amplitudenfeld aufbauen: 1 ± sigma * noise
     amp = 1.0 + sigma * noise
 
-    # zu wilde Extremwerte begrenzen (3σ)
     amp_min = 1.0 - 3.0 * sigma
     amp_max = 1.0 + 3.0 * sigma
     amp = np.clip(amp, amp_min, amp_max)
@@ -200,20 +160,12 @@ def apply_dimer_amplitude_noise(
 
 def white_artifacts(
     img_pil: Image.Image,
-    max_lines: int = 12,       # maximale Anzahl Artefakt-Streifen pro Bild (deutlich weniger)
+    max_lines: int = 12,       # maximale Anzahl Artefakt-Streifen pro Bild 
     min_width: int = 15,       # minimale Stripe-Länge
     max_width: int = 120,      # maximale Stripe-Länge
-    typical_min: int = 30,     # typischer Bereich für die meisten Stripes
+    typical_min: int = 30,     
     typical_max: int = 80,
 ) -> Image.Image:
-    """
-    Fügt weiche, weiße STM-ähnliche Artefakte hinzu.
-
-    - Weniger, aber realistischere Streifen.
-    - Jeder Stripe hat einen hellen "Kern" am Rand und läuft entlang seiner Länge weich aus.
-    - Keine harten 255er-Balken, sondern additive Aufhellung um typ. +20..+70 Graustufen,
-      weich geblurrt.
-    """
 
     img_gray = img_pil.convert("L")
     w, h = img_gray.size
@@ -221,20 +173,18 @@ def white_artifacts(
     # Basis-Bild als float
     base = np.array(img_gray, dtype=np.float32)
 
-    # Artefakt-Layer (Delta-Helligkeit, in Graustufen)
+    # Artefakt-Layer 
     artifact = np.zeros((h, w), dtype=np.float32)
 
     # Wie viele Stripes wirklich zeichnen?
     if max_lines <= 0:
         return img_pil
 
-    n_stripes = random.randint(0, max_lines)  # 0..max_lines (also oft auch wenige)
+    n_stripes = random.randint(0, max_lines) 
 
     for _ in range(n_stripes):
-        # Höhe des Stripes (1..stripe_height)
         stripe_h = 1
 
-        # Breite: meist im "typischen" Bereich, gelegentlich breiter/schmaler
         if random.random() < 0.8:
             stripe_w = random.randint(typical_min, typical_max)
         else:
@@ -254,8 +204,6 @@ def white_artifacts(
         # Maximale zusätzliche Helligkeit am hellsten Punkt des Stripes (Delta)
         peak_delta = random.uniform(230.0, 255.0)
 
-        # Helles Ende -> dunkles Ende als 1D-Gradient
-        # Richtung: entweder links->rechts oder rechts->links
         grad = np.linspace(peak_delta, 0.0, stripe_w, dtype=np.float32)
         if random.random() < 0.5:
             grad = grad[::-1]
@@ -264,17 +212,14 @@ def white_artifacts(
         if stripe_w >= 4:
             grad[:3] = 255.0
 
-        # Stripe in das Artifact-Array eintragen (gleicher Verlauf für jede Zeile des Stripes)
         patch = artifact[y : y + stripe_h, x0:x1]
         # Broadcasting: (stripe_h, stripe_w) + (stripe_w,) -> (stripe_h, stripe_w)
         patch = np.maximum(patch, grad[None, :])
         artifact[y : y + stripe_h, x0:x1] = patch
 
-    # Wenn gar keine Artefakte erzeugt wurden: direkt zurück
     if artifact.max() <= 0:
         return img_pil
 
-    # In PIL-Image umwandeln und weichzeichnen, damit die Ränder auslaufen
     artifact_img = Image.fromarray(
         np.clip(artifact, 0, 255).astype(np.uint8), mode="L"
     )

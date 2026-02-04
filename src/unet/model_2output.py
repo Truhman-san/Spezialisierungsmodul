@@ -50,7 +50,7 @@ def build_unet(
     # Gemeinsames Feature-Map für beide Köpfe
     features = d1
 
-    # Head 1: Multiclass-Output (Defekte etc.)
+    # Head 1: Multiclass-Output 
     main_out = L.Conv2D(
         num_classes,
         1,

@@ -15,17 +15,11 @@ def _update_mask_from_factor(
     rel_thresh: float = 0.2,
     abs_thresh: float = 0.02,
 ) -> np.ndarray:
-    """
-    Setzt die Label-Maske nur dort, wo |factor - 1| groß genug ist.
-
-    - rel_thresh: Anteil des Maximal-Kontrasts (z.B. 0.2 = 20 %)
-    - abs_thresh: absoluter Minimalwert, um Numerik-Zeug zu ignorieren
-    """
     delta = np.abs(factor - 1.0)
     max_delta = float(delta.max()) if delta.size > 0 else 0.0
 
     if max_delta <= 0.0 or not np.isfinite(max_delta):
-        return mask  # kein sichtbarer Defekt
+        return mask  
 
     thr = max(abs_thresh, rel_thresh * max_delta)
     local_mask = delta > thr

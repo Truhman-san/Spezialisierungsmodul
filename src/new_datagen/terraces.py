@@ -29,7 +29,6 @@ def remove_thin_steps(tile_labels: np.ndarray, min_thickness: int = 2) -> np.nda
         if num <= 2:
             continue
 
-        # prüfe jede Komponente
         for cid in range(1, num):
             comp = (cc == cid)
             ys, xs = np.where(comp)
@@ -99,10 +98,6 @@ def perturb_tile_labels(
 
 def smooth_terrace_boundaries(labels: np.ndarray,
                               iters: int = 1) -> np.ndarray:
-    """
-    Glättet zackige Terrassenkanten mit einem 3x3-Mehrheitsfilter.
-    Entfernt 1-Pixel-Ausreißer direkt an den Kanten.
-    """
     import scipy.ndimage as ndi
 
     out = labels.copy()
@@ -135,7 +130,6 @@ def remove_island_fragments(tile_labels):
         # Connected components
         num_labels, cc = cv2.connectedComponents(mask, connectivity=8)
         if num_labels <= 2:
-            # entweder nur Hintergrund + eine Komponente → ok
             continue
 
         # größte Komponente finden
@@ -162,7 +156,6 @@ def remove_island_fragments(tile_labels):
             if neighbors:
                 new_label = int(np.bincount(neighbors).argmax())
             else:
-                # fallback: zum nächstliegenden Label
                 new_label = t-1 if t > 0 else t+1
 
             cleaned[comp_mask] = new_label
@@ -176,17 +169,6 @@ def generate_parallel_step_tile_labels(
     min_plateau: int = 1,
     max_plateau: int = 3,
 ) -> tuple[np.ndarray, int]:
-    """
-    Erzeugt ein Tile-Label-Feld mit GENAU EINER Stufe, deren Kante
-    parallel zu den Dimerreihen verläuft (horizontal im Tile-Raster).
-
-    Eigenschaften:
-    - Zwei Terrassen (Labels 0 und 1)
-    - Kantenverlauf ist stufig:
-        * jedes Plateau ist 1–3 Tiles breit
-        * die Stufe wandert nur in EINE Richtung (monoton)
-    - Kante liegt strikt auf Tile-Grenzen -> keine halben Dimere.
-    """
     tile_labels = np.zeros((n_rows_tiles, n_cols_tiles), dtype=np.int32)
 
     if n_rows_tiles < 2:
@@ -202,14 +184,9 @@ def generate_parallel_step_tile_labels(
 
     col = 0
     while col < n_cols_tiles:
-        # Plateaubreite in Tiles (1–3)
         plateau = random.randint(min_plateau, max_plateau)
         end_col = min(n_cols_tiles, col + plateau)
 
-        # Für diese Spalten ist die Kante zwischen cur_row-1 und cur_row
-        # -> oben: Label 0, unten: Label 1 (oder umgekehrt, wenn du willst)
-        # hier: 0 unten, 1 oben oder umgekehrt? Du kannst das nach Bedarf drehen.
-        # Ich nehme: 0 unten, 1 oben.
         tile_labels[:cur_row, col:end_col] = 0
         tile_labels[cur_row:, col:end_col] = 1
 
@@ -217,12 +194,9 @@ def generate_parallel_step_tile_labels(
         if col >= n_cols_tiles:
             break
 
-        # Nächste Stufe: eine Zeile rauf oder runter (monoton)
         next_row = cur_row + direction
 
-        # Wenn wir an den Rand kommen, keine weiteren Sprünge mehr
         if next_row <= 0 or next_row >= n_rows_tiles:
-            # Rest als letztes Plateau mit konstanter Höhe
             tile_labels[:cur_row, col:] = 0
             tile_labels[cur_row:, col:] = 1
             break
@@ -239,16 +213,6 @@ def generate_terrace_heightmap(
     step_height_range: Tuple[float, float] = (0.4, 1.0),
     use_parallel_step: bool = False,  # NEU
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Erzeugt eine Terrassen-Heightmap + Label-Map im Pixelraum.
-
-    Neues Konzept:
-    - Arbeitet im Tile-Raster (TILE_HEIGHT x TILE_WIDTH).
-    - Baut eine 2D-Höhenfunktion (globaler Trend + glattes Noise).
-    - Quantisiert diese Höhenfunktion in n_terraces Stufen.
-    - Upsampling auf Pixel-Grid => Kanten immer auf ganzen Tiles,
-      also nie durch halbe Dimere.
-    """
     H = int(H)
     W = int(W)
 
@@ -257,7 +221,6 @@ def generate_terrace_heightmap(
     n_cols_tiles = int(np.ceil(W / TILE_WIDTH))
 
     if use_parallel_step:
-        # SPEZIALFALL: horizontale Dimerreihen -> stufige Kante
         tile_labels, n_terraces = generate_parallel_step_tile_labels(
             n_rows_tiles,
             n_cols_tiles,
@@ -265,7 +228,6 @@ def generate_terrace_heightmap(
             max_plateau=3,
         )
     else:
-        # DEIN bisheriger Code: 2D-Höhenfunktion + Noise + Quantisierung
         # --- 2) Anzahl Terrassen ---
         if max_steps < 1:
             max_steps = 1
@@ -307,13 +269,11 @@ def generate_terrace_heightmap(
         tile_labels = remove_island_fragments(tile_labels)
 
         # --- 4) Quantisierung in diskrete Terrassen ---
-        # n_terraces-1 zufällige Schwellwerte in (0,1)
         thresholds = sorted(random.uniform(0.0, 1.0) for _ in range(n_terraces - 1))
         tile_labels = np.digitize(base_grad, thresholds).astype(np.int32)
 
-        # mehr Durchgänge + höhere Move-Probability für extreme Klippen
-        n_passes = random.randint(2, 4)      # statt 1
-        move_prob = random.uniform(0.4, 0.7) # statt fix 0.35
+        n_passes = random.randint(2, 4)     
+        move_prob = random.uniform(0.4, 0.7) 
 
         tile_labels = perturb_tile_labels(tile_labels, n_passes=n_passes, move_prob=move_prob)
         tile_labels = remove_thin_steps(tile_labels, min_thickness=2)
@@ -322,7 +282,6 @@ def generate_terrace_heightmap(
         # --- 4b) Sanity-Check: Mindestens zwei Terrassen erzwingen ---
         unique = np.unique(tile_labels)
         if unique.size < 2:
-            # Notfall-Fall: eine horizontale Stufe ins Tile-Raster schneiden
             n_rows_tiles, n_cols_tiles = tile_labels.shape
 
             if n_rows_tiles >= 2:
@@ -362,7 +321,6 @@ def generate_terrace_heightmap(
                     continue
 
                 t = int(tile_labels[r, c])
-                # Safety, falls mal ein Level > n_terraces-1 entsteht (sollte nicht passieren)
                 t = max(0, min(t, n_terraces - 1))
 
                 labels[y0:y1, x0:x1] = t
@@ -388,8 +346,7 @@ def jitter_tile(tile):
     row_noise = np.random.normal(0, 3, size=(t.shape[0],1))
     t = t + row_noise
 
-    # Blur ENTLANG der Dimerachse (hier: horizontal)
-    t = cv2.GaussianBlur(t, (3,1), 0)   # statt (1,3)
+    t = cv2.GaussianBlur(t, (3,1), 0)   
 
     return np.clip(t, 0, 255).astype(np.uint8)
 
@@ -399,14 +356,6 @@ def apply_dimer_amplitude_noise(
     sigma: float = 0.06,
     blur_ksize: int = 3,
 ) -> np.ndarray:
-    """
-    Legt ein weiches 2D-Noisefeld auf die Dimeramplitude.
-
-    - sigma: Stärke der Amplitudenschwankung (≈ 0.03–0.10 sinnvoll)
-    - blur_ksize: bestimmt die Korrelation (3 -> 1–3 px, also gut für DL)
-
-    Ergebnis: lokale Variation der Dimerhöhe, ohne Kanten zu verschmieren.
-    """
     import cv2
 
     img = image.astype(np.float32) / 255.0
@@ -414,7 +363,6 @@ def apply_dimer_amplitude_noise(
     # weißes Rauschen
     noise = np.random.randn(*img.shape).astype(np.float32)
 
-    # glätten -> lokale Korrelation über ein paar Pixel
     if blur_ksize is not None and blur_ksize > 1:
         if blur_ksize % 2 == 0:
             blur_ksize += 1
@@ -442,16 +390,6 @@ def render_dimers_for_terraces(
     labels: np.ndarray,
     base_tile: np.ndarray,
 ) -> np.ndarray:
-    """
-    Rendert Dimerpattern pro Terrasse *maskenbasiert*.
-
-    - Jede Terrasse bekommt ein eigenes Dimerfeld.
-    - Orientierung:
-        - Terrassen mit geradem Label (0, 2, 4, ...)  -> 0° (BASE_TILE)
-        - Terrassen mit ungeradem Label (1, 3, 5, ...) -> 90° (np.rot90(BASE_TILE))
-    - Es wird NICHT mehr mit cv2 rotiert, dadurch keine Misch-/Alias-Artefakte.
-    """
-
     if labels.ndim != 2:
         raise ValueError("labels muss 2D (H, W) sein.")
 
@@ -493,16 +431,15 @@ def render_dimers_for_terraces(
         crop = tile_big[:box_h, :box_w]
 
         # In Canvas nur an Masken-Pixeln schreiben
-        region_mask = mask[y_min:y_max, x_min:x_max]          # (box_h, box_w)
-        region = canvas[y_min:y_max, x_min:x_max]             # (box_h, box_w)
-        region[region_mask] = crop[region_mask]               # korrekt (gleiche shape!)
+        region_mask = mask[y_min:y_max, x_min:x_max]  
+        region = canvas[y_min:y_max, x_min:x_max]           
+        region[region_mask] = crop[region_mask]             
 
 
     return np.clip(canvas, 0, 255).astype(np.uint8)
 
 
 def boost_contrast(x, strength=1.4):
-    # strength > 1 → mehr Punch
     mid = 0.5
     return mid + (x - mid) * strength
 
@@ -513,12 +450,6 @@ def compute_terrace_edge_field(
     max_val: float = 0.85,
     gamma: float = 1.0,
 ) -> np.ndarray:
-    """
-    Berechnet ein Helligkeitsfeld für jede Terrasse:
-    oben hell (max_val), unten dunkel (min_val).
-    Der Gradient geht vollständig über die gesamte Terrasse.
-    """
-
     if labels.ndim != 2:
         raise ValueError("labels muss 2D sein.")
 
@@ -543,7 +474,7 @@ def compute_terrace_edge_field(
                 continue
 
             span = float(y_bottom - y_top)
-            alphas = (ys - y_top) / span  # nur die Indizes der Terrasse
+            alphas = (ys - y_top) / span 
             col_vals = max_val - (alphas ** gamma) * (max_val - min_val)
 
             grad[ys, x] = col_vals
@@ -558,28 +489,13 @@ def apply_terrace_edge_gradient(
     min_val: float = 0.0,
     max_val: float = 1.00,
 ) -> np.ndarray:
-    """
-    Wendet den Terrassen-Gradienten auf ein beliebiges Bild an, indem
-    Bild und Gradient gemischt werden.
-
-    - image: uint8, [0,255]
-    - labels: Terrassen-Labels
-    - blend: 0 -> nur Bild, 1 -> nur Gradient
-    - min_val/max_val: grobe Zielhelligkeiten unten/oben
-
-    Neu:
-    - Gradient wird immer auf [0,1] normalisiert
-    - in einem Teil der Fälle wird ein extremer Kontrastmodus aktiviert:
-      Kante fast weiß, gegenüberliegende Seite fast schwarz
-    """
-
     if image.shape != labels.shape:
         raise ValueError("image und labels müssen gleiche Shape haben.")
 
     # 1) Bild in [0,1]
     img = image.astype(np.float32) / 255.0
 
-    # 2) Terrassen-Gradient berechnen (liefert grob min_val..max_val)
+    # 2) Terrassen-Gradient berechnen
     grad = compute_terrace_edge_field(
         labels,
         min_val=min_val,
@@ -597,13 +513,13 @@ def apply_terrace_edge_gradient(
     else:
         grad[:] = 0.5
 
-    # 4) Baseline: etwas nichtlinear machen (leichte Verstärkung der Kanten)
+    # 4) Baseline
     base_gamma = random.uniform(1.0, 2.0)
     grad = np.clip(grad, 0.0, 1.0) ** base_gamma
 
     # 5) Mit gewisser Wahrscheinlichkeit EXTREM-Fall erzwingen:
     #    eine Seite sehr hell, andere sehr dunkel.
-    extreme_prob = 0.30  # 30 % der Bilder werden "krass"
+    extreme_prob = 0.30 
     local_blend = float(blend)
 
     if random.random() < extreme_prob:
@@ -642,13 +558,6 @@ def soften_and_flatten_contrast(
     lift_black: float = 0.30,
     reduce_range: float = 0.20,
 ) -> np.ndarray:
-    """
-    Postprocessing für die fertige Surface:
-
-    - hebt die sehr dunklen Zwischenräume etwas an (lift_black)
-    - reduziert den Dynamikbereich (reduce_range)
-    - verwischt Dimere leicht (Gaussian Blur), damit sie weniger hart getrennt sind
-    """
     import cv2
 
     img = image.astype(np.float32) / 255.0
@@ -657,12 +566,11 @@ def soften_and_flatten_contrast(
     mean_val = float(img.mean())
     img = mean_val + (img - mean_val) * (1.0 - reduce_range)
 
-    # 2) Schwarze Bereiche anheben (Zwischenräume werden heller)
-    img = img + lift_black * (1.0 - img)  # 0 -> lift_black, 1 -> 1
+    # 2) Schwarze Bereiche anheben 
+    img = img + lift_black * (1.0 - img)  
 
-    # 3) Leicht weichzeichnen, damit Dimere "verschmelzen"
+    # 3) Leicht weichzeichnen, damit Dimere verschmelzen
     if blur_ksize is not None and blur_ksize > 1:
-        # Kernelgröße muss ungerade sein
         if blur_ksize % 2 == 0:
             blur_ksize += 1
         img = cv2.GaussianBlur(img, (blur_ksize, blur_ksize), 0)
@@ -680,16 +588,6 @@ def apply_terrace_edge_gradient(
     edge_blur_ksize: int = 5,
     edge_blur_strength: float = 1.0,
 ) -> np.ndarray:
-    """
-    Wendet den Terrassen-Gradienten auf ein beliebiges Bild an, indem
-    Bild und Gradient *additiv geblendet* werden.
-
-    NEU:
-    - Terrassenkanten werden lokal geglättet:
-      Der Gradient wird nur in Kanten-Nähe weichgezeichnet,
-      so dass die Kante weniger hart, aber weiterhin sichtbar ist.
-    """
-
     import cv2
 
     if image.shape != labels.shape:
@@ -702,7 +600,6 @@ def apply_terrace_edge_gradient(
     grad = compute_terrace_edge_field(labels, min_val=min_val, max_val=max_val)
 
     # 3) Terrassenkanten aus labels bestimmen
-    #    -> überall dort, wo sich Nachbarn im Label unterscheiden
     lab = labels.astype(np.int32)
     edge_mask = np.zeros_like(lab, dtype=np.uint8)
 
@@ -714,7 +611,6 @@ def apply_terrace_edge_gradient(
     edge_mask[:-1, :] |= (lab[1:, :] != lab[:-1, :]).astype(np.uint8)
 
     # 4) Kantenmaske in einen weichen Übergangsbereich umwandeln
-    #    -> Gaussian Blur auf die Maske, dann normalisieren nach [0,1]
     if edge_blur_ksize is not None and edge_blur_ksize > 1:
         if edge_blur_ksize % 2 == 0:
             edge_blur_ksize += 1
@@ -744,7 +640,7 @@ def apply_terrace_edge_gradient(
     if blend > 1.0:
         blend = 1.0
 
-    # 8) Additiv mischen: Bild + (ggf. geglätteter) Gradient
+    # 8) Additiv mischen: Bild + Gradient
     out = (1.0 - blend) * img + blend * grad_smooth
 
     return np.clip(out * 255.0, 0, 255).astype(np.uint8)
@@ -754,23 +650,16 @@ def generate_base_surface(
     canvas_size: Tuple[int, int] = CANVAS_SIZE,
     add_terraces: bool = True,
     terrace_strength: float = 0.7,
-    horizontal_dimers: bool = False,   # NEU: globale Dimer-Ausrichtung
+    horizontal_dimers: bool = False,  
 ) -> np.ndarray:
     H, W = int(canvas_size[0]), int(canvas_size[1])
-    """
-    High-Level:
-    - erzeugt Terrassen-Heightmap + Labels
-    - rendert Dimerreihen pro Terrasse (0°/90° alternierend)
-    - legt Helligkeitsgradienten entlang der Terrassenkanten über die *gesamte* Terrasse
-    - komprimiert anschließend den Kontrast und verschmilzt Dimere leicht
-    """
     H, W = int(canvas_size[0]), int(canvas_size[1])
 
     if add_terraces:
         z, labels = generate_terrace_heightmap(
             H,
             W,
-            use_parallel_step=horizontal_dimers,  # hier schaltest du um
+            use_parallel_step=horizontal_dimers,  
         )
     else:
         z = np.zeros((H, W), dtype=np.float32)
@@ -781,11 +670,11 @@ def generate_base_surface(
     # Lokale Amplitudenvariation der Dimere (1–3 px korreliert)
     dimer_canvas = apply_dimer_amplitude_noise(
         dimer_canvas,
-        sigma=0.08,     # Stärke der Variationen
-        blur_ksize=10,   # ~1–3 Pixel Korrelation
+        sigma=0.08,   
+        blur_ksize=10, 
     )
 
-    # Terrassen-Gradient auf gesamte Terrasse (Dimere + Zwischenräume + später Defekte)
+    # Terrassen-Gradient auf gesamte Terrasse 
     canvas = apply_terrace_edge_gradient(
         dimer_canvas,
         labels,
@@ -795,17 +684,5 @@ def generate_base_surface(
         edge_blur_ksize=6,
         edge_blur_strength=2.5,
     )
-
-    # >>> Kontrast glätten & Dimere verschmelzen lassen <<<
-    # blur_choices = (0, 3)  # 3 = eher scharf, 7 = ziemlich weich
-    # blur_ksize = random.choice(blur_choices)
-    # blur_ksize = 3
-
-    # canvas = soften_and_flatten_contrast(
-    #     canvas,
-    #     blur_ksize=blur_ksize,      # ggf. auf 5 erhöhen, wenn es noch zu scharf ist
-    #     lift_black=0.00,   # höher -> Zwischenräume heller
-    #     reduce_range=0.00, # höher -> Gesamt-Kontrast flacher
-    # )
 
     return canvas

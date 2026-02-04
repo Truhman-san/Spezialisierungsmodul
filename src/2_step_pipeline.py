@@ -6,15 +6,13 @@ import tensorflow as tf
 from PIL import Image
 import matplotlib.patches as mpatches
 
-from src.predictions.utils import load_png_gray  # (H,W,1) float32, [0,1]
+from src.predictions.utils import load_png_gray  
 
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
-# Row-Multitask-Modell
 ROWS_PATH   = PROJECT_ROOT / "runs" / "multitask_test" / "model_final.keras"
 
-# Die beiden Defekt-Modelle aus deinem Ensemble-Skript
 MODEL1_PATH = PROJECT_ROOT / "runs" / "ng_f60" / "model_final.keras"
 MODEL2_PATH = PROJECT_ROOT / "runs" / "ngns_f80" / "model_final.keras"
 
@@ -41,7 +39,6 @@ def ensemble_defect_predict(image_tf):
     logits1 = model1.predict(x, verbose=0)[0]  # (H,W,C)
     logits2 = model2.predict(x, verbose=0)[0]  # (H,W,C)
 
-    # Wenn letzter Layer Softmax ist, sind das schon Wahrscheinlichkeiten
     p1 = logits1
     p2 = logits2
 
@@ -99,9 +96,9 @@ def predict_pipeline(image_tf):
         p_ens:      (H,W,C) Probabilities (vom Defektensemble)
         gated_def:  (H,W,C) Probabilities nach Row-Gating
     """
-    img_np = np.array(image_tf.numpy(), dtype=np.float32)  # (H,W,1)
+    img_np = np.array(image_tf.numpy(), dtype=np.float32) 
 
-    x = np.expand_dims(img_np, axis=0)  # (1,H,W,1)
+    x = np.expand_dims(img_np, axis=0) 
 
     # --- Stage 1: Rows aus Multitask-Modell ---
     preds_row = row_model.predict(x, verbose=0)
@@ -109,7 +106,6 @@ def predict_pipeline(image_tf):
     if isinstance(preds_row, dict):
         row_prob = preds_row["rows"][0, ..., 0]
     else:
-        # Liste von Outputs -> anhand der output_names Index finden
         out_names = list(getattr(row_model, "output_names", []))
         rows_idx = out_names.index("rows")
         row_prob = preds_row[rows_idx][0, ..., 0]
@@ -118,16 +114,14 @@ def predict_pipeline(image_tf):
     row_mask = (row_prob > 0.5).astype(np.uint8)
 
     # --- Stage 2: Ensemble-Defekte ---
-    final_pred, p_ens = ensemble_defect_predict(image_tf)  # (H,W), (H,W,C)
+    final_pred, p_ens = ensemble_defect_predict(image_tf)
 
     # --- Gating: Ensemble nur auf Hintergrund-Pixeln anwenden ---
-    # Hintergrundmaske: nur dort darf das Ensemble "aktiv" sein
-    bg_mask = (row_mask == 0).astype(np.uint8)        # 1 = Hintergrund, 0 = Reihe
+    bg_mask = (row_mask == 0).astype(np.uint8)   
     bg_mask_3c = np.repeat(bg_mask[..., None], p_ens.shape[-1], axis=-1)
 
     gated_def = p_ens * bg_mask_3c
 
-    # Da in den Reihen (bg_mask=0) alle Klassen 0 werden, gibt argmax dort Klasse 0 zurück.
     pred_labels = np.argmax(gated_def, axis=-1).astype(np.uint8)
 
     return row_mask, pred_labels, p_ens, gated_def
@@ -154,8 +148,8 @@ def main():
         base_name = img_path.stem
         print(f"[{idx}/{n_total}] {base_name}")
 
-        image_tf = load_png_gray(img_path)        # (H,W,1)
-        img_model = image_tf.numpy()[..., 0]      # (H,W)
+        image_tf = load_png_gray(img_path)       
+        img_model = image_tf.numpy()[..., 0]     
         gray_arr = np.array(Image.open(img_path))
 
         # --- Pipeline aufrufen ---

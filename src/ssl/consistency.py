@@ -8,7 +8,7 @@ def kl_divergence(p_teacher: tf.Tensor, p_student: tf.Tensor, eps: float = 1e-6)
     """
     p_teacher = tf.clip_by_value(p_teacher, eps, 1.0)
     p_student = tf.clip_by_value(p_student, eps, 1.0)
-    kl = tf.reduce_sum(p_teacher * (tf.math.log(p_teacher) - tf.math.log(p_student)), axis=-1)  # (B,H,W)
+    kl = tf.reduce_sum(p_teacher * (tf.math.log(p_teacher) - tf.math.log(p_student)), axis=-1) 
     return tf.reduce_mean(kl)
 
 def simple_stm_augment(x: tf.Tensor, seed: int | None = None):
@@ -36,7 +36,6 @@ def simple_stm_augment(x: tf.Tensor, seed: int | None = None):
     x = x + noise
 
     # small translation via padding + random crop
-    # (works well when input size is fixed, like yours)
     pad = 8
     x_pad = tf.pad(x, paddings=[[0,0],[pad,pad],[pad,pad],[0,0]], mode="REFLECT")
     x = tf.image.random_crop(x_pad, size=tf.shape(x), seed=seed + 5)

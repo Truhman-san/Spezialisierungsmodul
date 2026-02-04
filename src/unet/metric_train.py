@@ -8,14 +8,13 @@ def mean_iou_metric(num_classes: int, ignore_background: bool = True):
     - y_pred: (B, H, W, C), Softmax-Output
     """
     def metric(y_true, y_pred):
-        # y_true ggf. (B, H, W, 1) -> (B, H, W)
         if y_true.shape.rank == 4 and y_true.shape[-1] == 1:
             y_true_ = tf.squeeze(y_true, axis=-1)
         else:
             y_true_ = y_true
 
         # harte Vorhersage: Argmax über Klassen
-        y_pred_labels = tf.argmax(y_pred, axis=-1)  # (B, H, W)
+        y_pred_labels = tf.argmax(y_pred, axis=-1) 
 
         # One-Hot
         y_true_oh = tf.one_hot(tf.cast(y_true_, tf.int32), depth=num_classes, dtype=tf.float32)
@@ -31,7 +30,6 @@ def mean_iou_metric(num_classes: int, ignore_background: bool = True):
         eps = 1e-7
         iou_per_class = (intersection + eps) / (union + eps)                     # (C,)
 
-        # ggf. Hintergrundklasse (0) ignorieren
         if ignore_background and num_classes > 1:
             iou_per_class = iou_per_class[1:]
 

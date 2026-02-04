@@ -8,13 +8,13 @@ from PIL import Image
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 
-from src.predictions.utils import load_png_gray  # (H,W,1) float32, [0,1]
+from src.predictions.utils import load_png_gray 
 
-# Ordner, in dem dieses Skript liegt: <projekt>/src
+# Ordner, in dem dieses Skript liegt
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT_DIR.parent
 
-# === Pfade zu deinen beiden Modellen (ANPASSEN!) ============================
+# Pfade zu deinen beiden Modellen 
 MODEL1_PATH = PROJECT_ROOT / "runs" / "sixth_training_f80" / "model_final.keras"
 MODEL2_PATH = PROJECT_ROOT / "runs" / "ng_f60" / "model_final.keras"
 
@@ -23,7 +23,6 @@ REAL_IMAGE_DIR = PROJECT_ROOT / "real_stm_converted_png"
 
 # Eigener Output-Ordner für Ensemble
 OUTPUT_DIR     = PROJECT_ROOT / "runs" / "ensemble_sixth_training_f80_ng_f60" / "predictions_real_tripanel_presentation"
-# ============================================================================
 
 
 def tif_to_colormap_png(tif_path, cmap_name="inferno"):
@@ -31,8 +30,8 @@ def tif_to_colormap_png(tif_path, cmap_name="inferno"):
     if img.mode != "L":
         img = img.convert("L")
 
-    raw = np.array(img).astype(np.float32)  # 0..255
-    raw_norm = raw / 255.0                  # 0..1
+    raw = np.array(img).astype(np.float32) 
+    raw_norm = raw / 255.0                 
 
     cmap = cm.get_cmap(cmap_name)
     colored = cmap(raw_norm)[..., :3]
@@ -69,34 +68,33 @@ def main():
             orig_arr = None
 
         # Modell-Input
-        image_tf = load_png_gray(img_path)        # (H,W,1), float32, [0,1]
-        img_model = image_tf.numpy()[..., 0]      # für Anzeige Panel 3
+        image_tf = load_png_gray(img_path)      
+        img_model = image_tf.numpy()[..., 0]    
 
         # Graustufenbild für Panel 2
-        gray_arr = np.array(Image.open(img_path))  # (H,W) uint8
+        gray_arr = np.array(Image.open(img_path))  
 
-                # === ENSEMBLE PREDICTION (M1 Basis, M2 kontrolliert 2-Dimer) ===
+                # === ENSEMBLE PREDICTION ===
         logits1 = model1.predict(
             tf.expand_dims(image_tf, axis=0), verbose=0
-        )[0]  # (H,W,C)
+        )[0]  
         logits2 = model2.predict(
             tf.expand_dims(image_tf, axis=0), verbose=0
-        )[0]  # (H,W,C)
+        )[0] 
 
-        # Falls Modelle Softmax im letzten Layer haben, sind das schon Wahrscheinlichkeiten
         p1 = logits1
         p2 = logits2
 
-        pred1 = np.argmax(p1, axis=-1).astype(np.uint8)   # (H,W)
-        conf1 = np.max(p1, axis=-1).astype(np.float32)    # (H,W)
+        pred1 = np.argmax(p1, axis=-1).astype(np.uint8)  
+        conf1 = np.max(p1, axis=-1).astype(np.float32)   
 
-        pred2 = np.argmax(p2, axis=-1).astype(np.uint8)   # (H,W)
-        conf2 = np.max(p2, axis=-1).astype(np.float32)    # (H,W)
+        pred2 = np.argmax(p2, axis=-1).astype(np.uint8)  
+        conf2 = np.max(p2, axis=-1).astype(np.float32)  
 
         # Basis: Modell 1
         final_pred = pred1.copy()
 
-        # --- Spezielle Behandlung für 2-Dimer (Klasse 2) -----------------
+        # --- Spezielle Behandlung für 2-Dimer ---
         class_idx_2dimer = 2
 
         # Hintergund- und 2-Dimer-Probabilitäten beider Modelle
@@ -106,15 +104,15 @@ def main():
         p2_2d  = p2[..., class_idx_2dimer]
 
         # Schwellen
-        T_BG_VETO = 0.90   # Ab hier sagt das andere Modell: "ziemlich sicher Background"
-        T_2D_MIN  = 0.50   # Mindest-Prob für 2-Dimer im jeweiligen Modell
+        T_BG_VETO = 0.90 
+        T_2D_MIN  = 0.50 
 
         # (1) 2-Dimer-Hallus von Modell 1 entfernen, wenn Modell 2 klar BG sieht
         clear_2_from_m1 = (
             (final_pred == class_idx_2dimer) &
             (p2_bg >= T_BG_VETO)
         )
-        final_pred[clear_2_from_m1] = 0  # auf Hintergrund zurücksetzen
+        final_pred[clear_2_from_m1] = 0 
 
         # (2) 2-Dimer aus Modell 1 übernehmen, wenn:
         #     - Modell 1 2-Dimer will,
@@ -136,15 +134,10 @@ def main():
             (p1_bg < T_BG_VETO)
         )
 
-        # Zuerst alles, was als 2-Dimer weg soll, auf 0 (oben passiert),
-        # dann alle gültigen Kandidaten auf 2 setzen (egal von welchem Modell)
         add_2_mask = cand_2_from_m1 | cand_2_from_m2
         final_pred[add_2_mask] = class_idx_2dimer
 
         pred_labels = final_pred
-        # =====================================================================
-
-        # =====================================================================
 
         # Tripanel
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -194,7 +187,7 @@ def main():
         axes[2].legend(
             handles=handles,
             loc="upper left",
-            bbox_to_anchor=(1.02, 1.0),  # rechts außerhalb der Achse
+            bbox_to_anchor=(1.02, 1.0),
             borderaxespad=0.0,
             fontsize=8,
         )

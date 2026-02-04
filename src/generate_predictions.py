@@ -7,21 +7,16 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from src.predictions.utils import load_png_gray, load_mask_labels, plot_image_and_labels
 
-# Ordner, in dem dieses Skript liegt: <projekt>/src
 ROOT_DIR = Path(__file__).resolve().parent
-# Projekt-Root: eine Ebene drüber: <projekt>
 PROJECT_ROOT = ROOT_DIR.parent
 
 STM_SUBFOLDER = "stm_dx_1_zones_1_amp_1_wa_1"
 
-# Modell
 MODEL_PATH = PROJECT_ROOT / "runs" / "ninth_training_f80" / "model_final.keras"
 
-# Bilder & Masken
 VAL_IMAGE_DIR = PROJECT_ROOT / "data" / "ninth_training_fixseventh" / "images" / STM_SUBFOLDER
 VAL_MASK_DIR  = PROJECT_ROOT / "data" / "ninth_training_fixseventh" / "masks" / STM_SUBFOLDER
 
-# Output
 OUTPUT_DIR = PROJECT_ROOT / "runs" / "ninth_training_f80" / f"predictions_{STM_SUBFOLDER}"
 
 NUM_SAMPLES = 10
@@ -38,7 +33,6 @@ def main():
     # print("VAL_MASK_DIR:", VAL_MASK_DIR)
     # print("OUTPUT_DIR:", OUTPUT_DIR)
 
-    # Path.make dir → funktioniert jetzt, weil OUTPUT_DIR ein Path ist
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1) Modell laden
@@ -74,17 +68,17 @@ def main():
         print(f"[{idx+1}/{num_samples}] {base_name}")
 
         # 4) Daten laden
-        image_tf = load_png_gray(img_path)     # (H,W,1) float32
-        gt_labels = load_mask_labels(msk_path) # (H,W) int
+        image_tf = load_png_gray(img_path)   
+        gt_labels = load_mask_labels(msk_path) 
 
         # 5) Prediction
         pred_logits = model.predict(
             tf.expand_dims(image_tf, axis=0), verbose=0
-        )[0]  # (H,W,C)
+        )[0]  
 
-        pred_labels = np.argmax(pred_logits, axis=-1)  # (H,W)
+        pred_labels = np.argmax(pred_logits, axis=-1) 
 
-        # 6) Plot speichern (Paths statt Strings)
+        # 6) Plot speichern
         overlay_path = OUTPUT_DIR / f"{base_name}_vis.png"
         plot_image_and_labels(
             image_tf.numpy(),
@@ -94,7 +88,7 @@ def main():
             title=base_name,
         )
 
-        # 7) Pred-Labelmap zusätzlich als PNG (für spätere Vergleiche)
+        # 7) Pred-Labelmap zusätzlich als PNG 
         pred_mask_path = OUTPUT_DIR / f"{base_name}_pred_labels.png"
         plt.imsave(pred_mask_path, pred_labels, cmap="tab10", origin="lower")
 
